@@ -1,0 +1,12 @@
+"event_id","subject_id","cna_type","chrom","genomic_start","genomic_end","input_row","width_bp","coding_overlap_bp","coding_fraction","n_affected_exons","affected_exon_orders","affected_transcript_exon_ranks","affected_exon_ids","exon_start","exon_end","n_coding_residues","residue_fraction_exon_proxy","complete_structural_mapping","structurally_localizable","localization_class","covers_ge_50pct","covers_ge_75pct","covers_ge_90pct","covers_100pct"
+"CNA_event_000004","PASYWF","HOMDEL","10",87864801,87869400,4,4600,0,0,0,"","","",,,0,0,FALSE,FALSE,"no_coding_overlap",FALSE,FALSE,FALSE,FALSE
+"CNA_event_000013","PAVKPV","HOMDEL","10",87865101,87871000,13,5900,0,0,0,"","","",,,0,0,FALSE,FALSE,"no_coding_overlap",FALSE,FALSE,FALSE,FALSE
+"CNA_event_000067","PAUHYI","HETDEL","10",87864801,87890400,67,25600,0,0,0,"","","",,,0,0,FALSE,FALSE,"no_coding_overlap",FALSE,FALSE,FALSE,FALSE
+"CNA_event_000073","PATZXK","HETDEL","10",87869801,87892300,73,22500,0,0,0,"","","",,,0,0,FALSE,FALSE,"no_coding_overlap",FALSE,FALSE,FALSE,FALSE
+"CNA_event_000094","PAVKUU","HETDEL","10",87864701,87866800,94,2100,0,0,0,"","","",,,0,0,FALSE,FALSE,"no_coding_overlap",FALSE,FALSE,FALSE,FALSE
+"CNA_event_000101","PAUXYI","HETDEL","10",87865101,87867900,101,2800,0,0,0,"","","",,,0,0,FALSE,FALSE,"no_coding_overlap",FALSE,FALSE,FALSE,FALSE
+"CNA_event_000112","PATSIL","HETDEL","10",87501201,87864300,112,363100,0,0,0,"","","",,,0,0,FALSE,FALSE,"no_coding_overlap",FALSE,FALSE,FALSE,FALSE
+"CNA_event_000124","PASIJX","HETDEL","10",86071301,87862700,124,1791400,0,0,0,"","","",,,0,0,FALSE,FALSE,"no_coding_overlap",FALSE,FALSE,FALSE,FALSE
+"CNA_event_000145","PAURXZ","HETDEL","10",87971201,89336700,145,1365500,0,0,0,"","","",,,0,0,FALSE,FALSE,"no_coding_overlap",FALSE,FALSE,FALSE,FALSE
+"CNA_event_000175","PATCKV","GAIN","10",87969001,117264400,175,29295400,0,0,0,"","","",,,0,0,FALSE,FALSE,"no_coding_overlap",FALSE,FALSE,FALSE,FALSE
+"CNA_event_000179","PASGRU","GAIN","10",87883001,87888600,179,5600,0,0,0,"","","",,,0,0,FALSE,FALSE,"no_coding_overlap",FALSE,FALSE,FALSE,FALSE

@@ -1,0 +1,5 @@
+"analysis_type","n_coding_mapped_subjects","n_coding_mapped_events","n_structurally_localizable_subjects","n_structurally_localizable_events","structurally_localizable_event_fraction","testable","reason"
+"HOMDEL",716,718,34,36,0.0501392757660167,TRUE,""
+"HETDEL",189,191,32,34,0.178010471204188,TRUE,""
+"GAIN",2,2,2,2,1,TRUE,""
+"ALL_CNA",885,911,46,72,0.0790340285400659,TRUE,""

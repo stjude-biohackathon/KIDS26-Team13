@@ -1,0 +1,4 @@
+"exon_order_1","transcript_exon_rank_1","exon_id_1","exon_order_2","transcript_exon_rank_2","exon_id_2","adjacent_in_transcript","n_cross_residue_pairs","n_smallest_distances_used","minimum_distance","robust_distance","median_cross_distance","sequence_filter_fallback"
+1,1,"ENSE00001833804",2,2,"ENSE00003496053",TRUE,5105,5,4.22853177828901,4.66314637749934,26.6915329833264,FALSE
+1,1,"ENSE00001833804",3,3,"ENSE00003529527",FALSE,200,5,51.9884117664696,53.4735209148941,66.5382420043371,FALSE
+2,2,"ENSE00003496053",3,3,"ENSE00003529527",TRUE,378,5,25.5030760693686,27.0584563101887,49.34247955509,FALSE
