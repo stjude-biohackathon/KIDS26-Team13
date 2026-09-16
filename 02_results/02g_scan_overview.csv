@@ -1,0 +1,3 @@
+"gene","transcript","chrom","n_coding_exons","n_structurally_eligible_exons","protein_length_mapped","n_residues_structurally_eligible","total_cds_nt","n_events_on_chromosome","n_events_overlapping_cds","n_subjects_overlapping_cds","n_events_partial_localizable_testable","n_subjects_partial_localizable_testable","n_events_whole_gene_only","fraction_events_testable"
+"PTEN","ENST00000371953","10",9,9,403,403,1209,185,174,148,130,104,44,0.747126436781609
+"CDKN2A","ENST00000304494","9",3,3,156,156,468,1036,911,885,72,46,839,0.0790340285400659

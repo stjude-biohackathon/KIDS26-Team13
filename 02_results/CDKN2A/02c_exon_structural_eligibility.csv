@@ -1,0 +1,4 @@
+"gene_name","transcript_id","exon_id","transcript_exon_rank","chrom","strand","cds_genomic_start","cds_genomic_end","residue_start","residue_end","exon_order","cds_length_nt","n_coding_residues","n_structural_residues","mapped_fraction","structurally_eligible","structural_eligibility_reason"
+"CDKN2A","ENST00000304494","ENSE00001833804",1,"9","-",21974678,21974827,1,50,1,150,50,50,1,TRUE,"eligible"
+"CDKN2A","ENST00000304494","ENSE00003496053",2,"9","-",21970902,21971208,51,153,2,307,103,103,1,TRUE,"eligible"
+"CDKN2A","ENST00000304494","ENSE00003529527",3,"9","-",21968232,21968242,153,156,3,11,4,4,1,TRUE,"eligible"
