@@ -195,6 +195,23 @@ validate_mutation_column_map <- function(
   invisible(TRUE)
 }
 
+# Validate hierarchical-clustering linkage method.
+validate_linkage_method <- function(linkage.method) {
+  allowed.methods <- c("complete", "average", "single", "ward.D2")
+  if (
+    length(linkage.method) != 1L ||
+      !is.character(linkage.method) ||
+      is.na(linkage.method) ||
+      !(linkage.method %in% allowed.methods)
+  ) {
+    stop(
+      "Invalid linkage.method '", paste(linkage.method, collapse = ", "),
+      "'. Allowed methods are: ", paste(allowed.methods, collapse = ", "), "."
+    )
+  }
+  invisible(TRUE)
+}
+
 # Validate scalar analysis settings before starting a long simulation run.
 validate_mutation_analysis_settings <- function(
     min.subjects,
@@ -202,7 +219,9 @@ validate_mutation_analysis_settings <- function(
     alpha,
     n.sim,
     calibration.fraction,
-    progress.every) {
+    progress.every,
+    linkage.method = "complete") {
+  validate_linkage_method(linkage.method)
   if (length(min.subjects) != 1L || is.na(min.subjects) || min.subjects < 1L) {
     stop("min.subjects must be one positive integer.")
   }
@@ -605,8 +624,12 @@ extract_hclust_sets <- function(hc) {
   node.members
 }
 
-# Construct one complete-linkage tree and return its leaves and merged branches.
-build_tree_sets <- function(residues, distance.matrix) {
+# Construct one hierarchical-clustering tree and return its leaves and merged branches.
+build_tree_sets <- function(
+    residues,
+    distance.matrix,
+    linkage.method = "complete") {
+  validate_linkage_method(linkage.method)
   residues <- sort(unique(as.integer(residues)))
 
   leaf.sets <- lapply(residues, function(z) z)
@@ -614,7 +637,7 @@ build_tree_sets <- function(residues, distance.matrix) {
     return(leaf.sets)
   }
 
-  hc <- stats::hclust(stats::as.dist(distance.matrix), method = "complete")
+  hc <- stats::hclust(stats::as.dist(distance.matrix), method = linkage.method)
   index.sets <- extract_hclust_sets(hc)
   internal.sets <- lapply(index.sets, function(i) residues[i])
 
@@ -649,7 +672,9 @@ build_candidate_clusters <- function(
     mapping,
     coordinates,
     min.subjects = 2L,
-    min.events = 2L) {
+    min.events = 2L,
+    linkage.method = "complete") {
+  validate_linkage_method(linkage.method)
   altered.residues <- sort(unique(mapping$residue))
   coordinate.rows <- match(altered.residues, coordinates$residue)
   xyz <- as.matrix(coordinates[coordinate.rows, c("x", "y", "z")])
@@ -661,8 +686,16 @@ build_candidate_clusters <- function(
     as.matrix(stats::dist(xyz))
   }
 
-  sets.1d <- build_tree_sets(altered.residues, distance.1d)
-  sets.3d <- build_tree_sets(altered.residues, distance.3d)
+  sets.1d <- build_tree_sets(
+    altered.residues,
+    distance.1d,
+    linkage.method = linkage.method
+  )
+  sets.3d <- build_tree_sets(
+    altered.residues,
+    distance.3d,
+    linkage.method = linkage.method
+  )
 
   source.map <- new.env(parent = emptyenv())
   residue.map <- new.env(parent = emptyenv())
@@ -907,7 +940,9 @@ run_null_simulations <- function(
     min.events,
     avoid.within.subject.overlap,
     random.seed,
-    progress.every = 100L) {
+    progress.every = 100L,
+    linkage.method = "complete") {
+  validate_linkage_method(linkage.method)
   legal.windows <- build_legal_windows(events, coordinates)
   null.1d <- matrix(
     Inf,
@@ -931,7 +966,8 @@ run_null_simulations <- function(
       mapping = simulated.mapping,
       coordinates = coordinates,
       min.subjects = min.subjects,
-      min.events = min.events
+      min.events = min.events,
+      linkage.method = linkage.method
     )
 
     null.1d[b, ] <- minimum_diameter_by_size(
@@ -1255,8 +1291,10 @@ run_grin3d_mutation_hotspots <- function(
     n.sim = 1000L,
     calibration.fraction = 0.50,
     random.seed = 20260828L,
-    progress.every = 100L) {
+    progress.every = 100L,
+    linkage.method = "complete") {
 
+  validate_linkage_method(linkage.method)
   validate_mutation_column_map(
     lesion.columns,
     required.keys = c("subject", "start", "end"),
@@ -1275,7 +1313,8 @@ run_grin3d_mutation_hotspots <- function(
     alpha = alpha,
     n.sim = n.sim,
     calibration.fraction = calibration.fraction,
-    progress.every = progress.every
+    progress.every = progress.every,
+    linkage.method = linkage.method
   )
   if (
     !is.null(coordinate.columns$confidence) &&
@@ -1295,7 +1334,8 @@ run_grin3d_mutation_hotspots <- function(
     n.sim = n.sim,
     calibration.fraction = calibration.fraction,
     random.seed = random.seed,
-    progress.every = progress.every
+    progress.every = progress.every,
+    linkage.method = linkage.method
   )
 
   dir.create(results.dir, recursive = TRUE, showWarnings = FALSE)
@@ -1352,7 +1392,8 @@ run_grin3d_mutation_hotspots <- function(
     mapping = mapped$mapping,
     coordinates = coordinates,
     min.subjects = analysis.options$min.subjects,
-    min.events = analysis.options$min.events
+    min.events = analysis.options$min.events,
+    linkage.method = analysis.options$linkage.method
   )
 
   if (nrow(observed.candidates) == 0L) {
@@ -1378,7 +1419,8 @@ run_grin3d_mutation_hotspots <- function(
     min.events = analysis.options$min.events,
     avoid.within.subject.overlap = analysis.options$avoid.within.subject.overlap,
     random.seed = analysis.options$random.seed,
-    progress.every = analysis.options$progress.every
+    progress.every = analysis.options$progress.every,
+    linkage.method = analysis.options$linkage.method
   )
 
   message("Calibrating size-specific and joint 1D/3D p-values.")
@@ -1411,6 +1453,7 @@ run_grin3d_mutation_hotspots <- function(
       coordinate.columns = coordinate.columns,
       confidence.filter.applied = !is.null(coordinate.columns$confidence),
       opportunity.weights.applied = !is.null(coordinate.columns$opportunity),
+      linkage.method = analysis.options$linkage.method,
       analysis.options = analysis.options
     ),
     coordinates = coordinates,

@@ -28,11 +28,15 @@
 # 1. DIRECTORIES AND INPUT FILES
 # ==============================================================================
 
-analysis.dir <- normalizePath(
-  "C:/Users/aelsayed/Desktop/GRIN3D-biohackathon/GRIN3D/PTEN_CNA",
-  winslash = "/",
-  mustWork = TRUE
-)
+analysis.dir <- if (file.exists("GRIN3D_exon_CNA_hotspots.R")) {
+  normalizePath(".", winslash = "/", mustWork = TRUE)
+} else if (file.exists(file.path("examples", "PTEN_CNA", "GRIN3D_exon_CNA_hotspots.R"))) {
+  normalizePath(file.path("examples", "PTEN_CNA"), winslash = "/", mustWork = TRUE)
+} else if (dir.exists("C:/Users/aelsayed/Desktop/GRIN3D-biohackathon/GRIN3D/PTEN_CNA")) {
+  normalizePath("C:/Users/aelsayed/Desktop/GRIN3D-biohackathon/GRIN3D/PTEN_CNA", winslash = "/", mustWork = TRUE)
+} else {
+  normalizePath("/Users/daniel/KIDS26-Team13/examples/PTEN_CNA", winslash = "/", mustWork = TRUE)
+}
 
 input.dir <- file.path(analysis.dir, "input_files")
 results.dir <- file.path(analysis.dir, "results")
@@ -158,11 +162,11 @@ use.plddt.filter <- FALSE
 minimum.plddt <- 70
 
 # Simulation settings.
-# Use 1,000 for development and at least 10,000 for stable comparisons.
-n.coverage.simulations <- 1000L
-n.structural.simulations <- 1000L
+# Production run uses exactly 500 simulations.
+n.coverage.simulations <- 500L
+n.structural.simulations <- 500L
 simulation.seed <- 20260907L
-progress.interval <- 200L
+progress.interval <- 20L
 
 # -----------------------------------
 # 4. run the analysis
@@ -280,7 +284,7 @@ pten.cna.results <- run_grin3d_exon_cna_hotspots(
   alpha = 0.05,
   
   # Use the simulation counts specified in the analysis-settings section.
-  # Use 1,000 for development and at least 10,000 for stable comparisons.
+  # Exactly 1,000 simulations for PTEN CNA production run.
   n.sim.coverage = n.coverage.simulations,
   n.sim.structural = n.structural.simulations,
   
@@ -290,7 +294,8 @@ pten.cna.results <- run_grin3d_exon_cna_hotspots(
   
   # Use the seed and progress interval specified in the settings section.
   random.seed = simulation.seed,
-  progress.every = progress.interval
+  progress.every = progress.interval,
+  linkage.method = "complete"
 )
 
 # ==============================================================================

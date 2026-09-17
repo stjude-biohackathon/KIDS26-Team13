@@ -272,6 +272,23 @@ validate_grin3d_column_map <- function(
   invisible(TRUE)
 }
 
+# Validate hierarchical-clustering linkage method.
+validate_linkage_method <- function(linkage.method) {
+  allowed.methods <- c("complete", "average", "single", "ward.D2")
+  if (
+    length(linkage.method) != 1L ||
+      !is.character(linkage.method) ||
+      is.na(linkage.method) ||
+      !(linkage.method %in% allowed.methods)
+  ) {
+    stop(
+      "Invalid linkage.method '", paste(linkage.method, collapse = ", "),
+      "'. Allowed methods are: ", paste(allowed.methods, collapse = ", "), "."
+    )
+  }
+  invisible(TRUE)
+}
+
 # Read a CSV, TSV, TXT, RDS or RData input and return it as a data frame.
 read_grin3d_input <- function(file, object.name = NULL) {
   if (!file.exists(file)) stop("Input file not found: ", file)
@@ -1235,12 +1252,12 @@ run_cna_coverage_null <- function(
     exons,
     cna.types,
     thresholds = c(0.50, 0.75, 0.90, 1.00),
-    n.sim = 1000L,
+    n.sim = 10000L,
     chromosome.length = NULL,
     min.exon.coding.overlap = 0,
     include.combined.analysis = TRUE,
     alpha = 0.05,
-    random.seed = 20260903L,
+    random.seed = 20260907L,
     progress.every = 100L) {
   if (n.sim < 1L) stop("n.sim.coverage must be at least 1.")
   thresholds <- sort(unique(as.numeric(thresholds)))
@@ -1537,7 +1554,7 @@ run_partial_localizable_recurrence_null <- function(
     exon.residue.map,
     cna.types,
     include.combined.analysis = TRUE,
-    n.sim = 1000L,
+    n.sim = 10000L,
     max.residue.fraction = 0.999999,
     residue.span.temperature = 0.50,
     uniform.window.mixture = 0.25,
@@ -1545,7 +1562,7 @@ run_partial_localizable_recurrence_null <- function(
     min.alternative.probability = 0.05,
     avoid.within.subject.overlap = TRUE,
     alpha = 0.05,
-    random.seed = 20260903L,
+    random.seed = 20260907L,
     progress.every = 100L) {
   if (n.sim < 1L) stop("n.sim.coverage must be at least 1.")
 
@@ -1818,11 +1835,12 @@ extract_cna_hclust_sets <- function(hc) {
   sets
 }
 
-# Construct a complete-linkage tree and return its single-exon and merged sets.
-build_cna_tree_sets <- function(items, distance.matrix) {
+# Construct a hierarchical-clustering tree and return its single-exon and merged sets.
+build_cna_tree_sets <- function(items, distance.matrix, linkage.method = "complete") {
+  validate_linkage_method(linkage.method)
   leaf.sets <- lapply(items, function(x) x)
   if (length(items) == 1L) return(leaf.sets)
-  hc <- stats::hclust(stats::as.dist(distance.matrix), method = "complete")
+  hc <- stats::hclust(stats::as.dist(distance.matrix), method = linkage.method)
   internal <- lapply(extract_cna_hclust_sets(hc), function(i) items[i])
   c(leaf.sets, internal)
 }
@@ -1852,7 +1870,9 @@ build_cna_candidate_clusters <- function(
     exons,
     exon.distance.matrix,
     min.subjects = 2L,
-    min.events = 2L) {
+    min.events = 2L,
+    linkage.method = "complete") {
+  validate_linkage_method(linkage.method)
   altered <- sort(unique(mapping$exon_order))
   if (!length(altered)) return(data.frame())
   if (!all(as.character(altered) %in% rownames(exon.distance.matrix))) {
@@ -1863,8 +1883,8 @@ build_cna_candidate_clusters <- function(
   distance.3d <- exon.distance.matrix[
     as.character(altered), as.character(altered), drop = FALSE
   ]
-  sets.1d <- build_cna_tree_sets(altered, distance.1d)
-  sets.3d <- build_cna_tree_sets(altered, distance.3d)
+  sets.1d <- build_cna_tree_sets(altered, distance.1d, linkage.method = linkage.method)
+  sets.3d <- build_cna_tree_sets(altered, distance.3d, linkage.method = linkage.method)
   source.map <- new.env(parent = emptyenv())
   exon.map <- new.env(parent = emptyenv())
 
@@ -2483,7 +2503,7 @@ run_cna_null_simulations <- function(
     exon.residue.map,
     exon.distance.matrix,
     sizes,
-    n.sim,
+    n.sim = 10000L,
     min.subjects,
     min.events,
     max.residue.fraction,
@@ -2491,18 +2511,32 @@ run_cna_null_simulations <- function(
     uniform.window.mixture,
     avoid.within.subject.overlap,
     random.seed,
-    progress.every = 100L) {
+    progress.every = 100L,
+    linkage.method = "complete",
+    mc.cores = NULL) {
+  validate_linkage_method(linkage.method)
   legal.windows <- build_legal_cna_windows(
     events, exons, exon.residue.map, max.residue.fraction
   )
-  null.1d <- matrix(
-    Inf, nrow = n.sim, ncol = length(sizes),
-    dimnames = list(NULL, as.character(sizes))
-  )
-  null.3d <- null.1d
+
+  n.cores <- if (!is.null(mc.cores)) {
+    as.integer(mc.cores)
+  } else {
+    getOption("mc.cores", parallel::detectCores())
+  }
+  if (is.na(n.cores) || n.cores < 1L) {
+    n.cores <- 1L
+  }
+
+  can_fork <- (.Platform$OS.type != "windows") &&
+    (n.cores > 1L) &&
+    exists("mclapply", where = asNamespace("parallel"), mode = "function")
+
+  old.rng <- RNGkind("L'Ecuyer-CMRG")
+  on.exit(RNGkind(old.rng[1L], old.rng[2L], old.rng[3L]), add = TRUE)
   set.seed(random.seed)
 
-  for (b in seq_len(n.sim)) {
+  run_one_sim <- function(b) {
     simulated.mapping <- simulate_cna_event_mapping(
       events,
       legal.windows,
@@ -2513,20 +2547,64 @@ run_cna_null_simulations <- function(
     )
     simulated.candidates <- build_cna_candidate_clusters(
       simulated.mapping, exons, exon.distance.matrix,
-      min.subjects, min.events
+      min.subjects, min.events,
+      linkage.method = linkage.method
     )
-    null.1d[b, ] <- minimum_cna_diameter_by_size(
-      simulated.candidates, sizes, "diameter_1d"
+    list(
+      d1 = minimum_cna_diameter_by_size(
+        simulated.candidates, sizes, "diameter_1d"
+      ),
+      d3 = minimum_cna_diameter_by_size(
+        simulated.candidates, sizes, "diameter_3d"
+      )
     )
-    null.3d[b, ] <- minimum_cna_diameter_by_size(
-      simulated.candidates, sizes, "diameter_3d"
-    )
+  }
 
-    if (progress.every > 0L &&
-        (b %% progress.every == 0L || b == n.sim)) {
-      message("Completed ", b, " of ", n.sim, " structural simulations.")
+  if (can_fork) {
+    effective.cores <- min(as.integer(n.cores), as.integer(n.sim))
+    sim_results <- parallel::mclapply(
+      seq_len(n.sim),
+      run_one_sim,
+      mc.cores = effective.cores,
+      mc.preschedule = TRUE,
+      mc.set.seed = TRUE
+    )
+    failed <- vapply(sim_results, inherits, logical(1L), what = "try-error")
+    if (any(failed)) {
+      err_msg <- as.character(sim_results[[which(failed)[1L]]])
+      stop("Structural simulation worker failed: ", err_msg)
+    }
+    null.1d <- matrix(
+      unlist(lapply(sim_results, `[[`, "d1"), use.names = FALSE),
+      nrow = n.sim, byrow = TRUE,
+      dimnames = list(NULL, as.character(sizes))
+    )
+    null.3d <- matrix(
+      unlist(lapply(sim_results, `[[`, "d3"), use.names = FALSE),
+      nrow = n.sim, byrow = TRUE,
+      dimnames = list(NULL, as.character(sizes))
+    )
+    if (progress.every > 0L) {
+      message("Completed ", n.sim, " of ", n.sim, " structural simulations.")
+    }
+  } else {
+    null.1d <- matrix(
+      Inf, nrow = n.sim, ncol = length(sizes),
+      dimnames = list(NULL, as.character(sizes))
+    )
+    null.3d <- null.1d
+    for (b in seq_len(n.sim)) {
+      res <- run_one_sim(b)
+      null.1d[b, ] <- res$d1
+      null.3d[b, ] <- res$d3
+
+      if (progress.every > 0L &&
+          (b %% progress.every == 0L || b == n.sim)) {
+        message("Completed ", b, " of ", n.sim, " structural simulations.")
+      }
     }
   }
+
   list(diameter_1d = null.1d, diameter_3d = null.3d)
 }
 
@@ -2545,14 +2623,18 @@ calibrate_cna_candidates <- function(
     alpha = 0.05) {
   n.sim <- nrow(null.results$diameter_1d)
   n.calibration <- floor(n.sim * calibration.fraction)
-  if (n.calibration < 50L || n.sim - n.calibration < 50L) {
+  if (n.calibration < 20L || n.sim - n.calibration < 20L) {
     stop(
-      "Use at least 100 structural simulations so both calibration and ",
-      "protein-wide evaluation contain at least 50 replicates."
+      "Use at least 40 structural simulations so both calibration and ",
+      "protein-wide evaluation contain at least 20 replicates."
     )
   }
   calibration.rows <- seq_len(n.calibration)
   evaluation.rows <- seq.int(n.calibration + 1L, n.sim)
+  if (length(calibration.rows) != n.calibration ||
+      length(evaluation.rows) != (n.sim - n.calibration)) {
+    stop("Calibration and evaluation split partition mismatch.")
+  }
   sizes <- as.integer(colnames(null.results$diameter_1d))
   calibration.1d <- null.results$diameter_1d[
     calibration.rows, , drop = FALSE
@@ -2899,11 +2981,14 @@ run_grin3d_exon_cna_hotspots <- function(
     min.subjects = 2L,
     min.events = 2L,
     alpha = 0.05,
-    n.sim.coverage = 1000L,
-    n.sim.structural = 1000L,
+    n.sim.coverage = 10000L,
+    n.sim.structural = 10000L,
     calibration.fraction = 0.50,
-    random.seed = 20260903L,
-    progress.every = 100L) {
+    random.seed = 20260907L,
+    progress.every = 100L,
+    linkage.method = "complete",
+    mc.cores = NULL) {
+  validate_linkage_method(linkage.method)
   validate_grin3d_column_map(
     cna.columns,
     required.keys = c("subject", "chrom", "start", "end", "type"),
@@ -3153,7 +3238,8 @@ run_grin3d_exon_cna_hotspots <- function(
 
     candidates <- build_cna_candidate_clusters(
       selected.mapping, exons, structural$distance_matrix,
-      min.subjects, min.events
+      min.subjects, min.events,
+      linkage.method = linkage.method
     )
     if (is.null(candidates) || base::nrow(candidates) == 0L) {
       testability[[a]] <- data.frame(
@@ -3188,7 +3274,9 @@ run_grin3d_exon_cna_hotspots <- function(
       uniform.window.mixture = uniform.window.mixture,
       avoid.within.subject.overlap = avoid.within.subject.overlap,
       random.seed = random.seed + a,
-      progress.every = progress.every
+      progress.every = progress.every,
+      linkage.method = linkage.method,
+      mc.cores = mc.cores
     )
     calibrated <- calibrate_cna_candidates(
       candidates, one.null, label, calibration.fraction, alpha
@@ -3290,7 +3378,10 @@ run_grin3d_exon_cna_hotspots <- function(
     min.alternative.probability = min.alternative.probability,
     n.sim.coverage = n.sim.coverage,
     n.sim.structural = n.sim.structural,
-    random.seed = random.seed
+    calibration.fraction = calibration.fraction,
+    random.seed = random.seed,
+    linkage.method = linkage.method,
+    mc.cores = mc.cores
   )
   result <- list(
     settings = settings,
@@ -3335,6 +3426,7 @@ run_grin3d_exon_cna_hotspots <- function(
     exon_pair_distances = structural$pair_table,
     structural_events = structural.events,
     structural_testability = testability,
+    linkage_method = linkage.method,
     clusters = clusters,
     cluster_members = members,
     structural_null_diameters = null.results,
