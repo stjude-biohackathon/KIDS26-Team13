@@ -1,0 +1,11 @@
+source=datasets/T_ALL_public_data/mutations_dataset.xlsx
+source_fields=gene,sample,variantID,aa_change,mutation_class,ExonicFunc,validation,quality.MULTI
+coordinate_rule=first affected residue; explicit amino-acid deletion/substitution ranges retain both endpoints
+gene=SUZ12
+included_rows=72
+excluded_without_resolvable_aa_position=11
+refseq_transcript=NM_015355
+refseq_protein=NP_056170.2
+uniprot_accession=Q15022
+coordinate_source=AlphaFold_DB_AF-Q15022-F1-model_v6.pdb
+sequence_validation=NP_056170.2 exactly matches UniProt Q15022 (739 residues)

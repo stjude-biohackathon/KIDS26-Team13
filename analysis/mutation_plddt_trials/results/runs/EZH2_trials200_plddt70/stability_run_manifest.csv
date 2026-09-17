@@ -1,0 +1,2 @@
+"label","protein","n_sim","min_subjects","min_events","random_seed","require_complete_event_mapping","avoid_within_subject_overlap","confidence_filter","min_confidence","opportunity_weights","elapsed_seconds","n_clusters","n_significant","results_dir"
+"EZH2_trials200_plddt70","EZH2",200,2,2,20260916,TRUE,TRUE,TRUE,70,FALSE,29.309,82,0,"/Users/sharmapk/Desktop/KIDS26-Team13/analysis/mutation_plddt_trials/results/runs/EZH2_trials200_plddt70"

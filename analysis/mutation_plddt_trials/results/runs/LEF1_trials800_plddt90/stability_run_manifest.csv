@@ -1,0 +1,2 @@
+"label","protein","n_sim","min_subjects","min_events","random_seed","require_complete_event_mapping","avoid_within_subject_overlap","confidence_filter","min_confidence","opportunity_weights","elapsed_seconds","n_clusters","n_significant","results_dir"
+"LEF1_trials800_plddt90","LEF1",800,2,2,20260916,TRUE,TRUE,TRUE,90,FALSE,27.585,23,2,"/Users/sharmapk/Desktop/KIDS26-Team13/analysis/mutation_plddt_trials/results/runs/LEF1_trials800_plddt90"

@@ -1,0 +1,627 @@
+---
+title: "GRIN3D mutation-hotspot stability evaluation"
+subtitle: "TP53, PTEN, SUZ12, EZH2, and LEF1 trial-depth and AlphaFold pLDDT sensitivity"
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
+output:
+  html_notebook:
+    toc: true
+    toc_float: true
+    number_sections: true
+    self_contained: true
+    code_folding: hide
+    mathjax: null
+---
+
+```{css, echo=FALSE}
+body { max-width: 1280px; margin: auto; }
+.main-container { max-width: 1280px !important; }
+table { width: 100%; font-size: 0.92em; }
+th, td { padding: 6px 9px !important; vertical-align: top !important; }
+pre { max-height: 520px; overflow-y: auto; }
+.figure { margin-top: 1.2em; margin-bottom: 2em; }
+.callout {
+  padding: 14px 18px; margin: 18px 0; border-left: 5px solid #2166ac;
+  background: #edf4fa;
+}
+.caution {
+  padding: 14px 18px; margin: 18px 0; border-left: 5px solid #d9a300;
+  background: #fff6df;
+}
+```
+
+# Purpose {.unnumbered}
+
+This notebook evaluates whether the GRIN3D mutation-hotspot prototype produces
+stable candidate clusters when two analysis settings are varied:
+
+1. the number of null simulations (`100` through `1,000` in increments of
+   `100`); and
+2. the minimum AlphaFold pLDDT threshold (`0`, `70`, or `90`).
+
+TP53 serves as the established dense positive-control pattern, while PTEN adds
+an independent mutation-rich tumor suppressor. SUZ12, EZH2, and LEF1 represent
+sparser mutation patterns across proteins with different lengths and confidence
+profiles.
+
+Here, **sparsity** is not a single formal label. It can entail fewer mutation
+events or affected subjects, fewer recurrent observations at the same residue,
+a low density of altered residues relative to protein length, or mutations that
+are widely dispersed in sequence or 3D space. These features have different
+statistical consequences: limited event and subject counts reduce power, weak
+recurrence makes compact clusters harder to distinguish from random placement,
+and spatial dispersion can produce many candidate branches without a compelling
+hotspot. Sparsity also makes confidence filtering more consequential because
+removing even a modest number of events may represent a large fraction of the
+analyzed cohort. Accordingly, the sparse-protein results are interpreted using
+retained events and subjects, cluster membership overlap, and p-value convergence
+together rather than mutation count alone.
+
+<div class="callout">
+**Primary conclusion.** Null-trial count changes Monte Carlo p-values and
+significance calls, but not the deterministic observed cluster membership at a
+fixed pLDDT threshold. pLDDT filtering can change cluster membership because it
+removes coordinates and mutation events, thereby changing the analyzed cohort.
+</div>
+
+```{r setup, include=FALSE}
+find_repo_root <- function(path = getwd()) {
+  path <- normalizePath(path, winslash = "/", mustWork = TRUE)
+  repeat {
+    if (file.exists(file.path(path, "development-code", "GRIN3D_mutation_hotspots.R"))) {
+      return(path)
+    }
+    parent <- dirname(path)
+    if (identical(parent, path)) stop("Could not find the repository root")
+    path <- parent
+  }
+}
+
+repo_root <- find_repo_root()
+analysis_root <- file.path(repo_root, "analysis", "mutation_plddt_trials")
+summary_dir <- file.path(analysis_root, "results", "summary")
+figure_dir <- file.path(analysis_root, "results", "figures")
+
+config <- read.csv(file.path(analysis_root, "configurations.csv"), stringsAsFactors = FALSE)
+run_metrics <- read.csv(file.path(summary_dir, "run_metrics.csv"), stringsAsFactors = FALSE)
+convergence <- read.csv(file.path(summary_dir, "trial_convergence_metrics.csv"), stringsAsFactors = FALSE)
+pvalue_clusters <- read.csv(file.path(summary_dir, "cluster_pvalue_convergence.csv"), stringsAsFactors = FALSE)
+earliest <- read.csv(file.path(summary_dir, "earliest_significance_convergence.csv"), stringsAsFactors = FALSE)
+
+knitr::opts_chunk$set(
+  echo = TRUE, message = FALSE, warning = FALSE,
+  fig.align = "center", out.width = "100%"
+)
+
+display_table <- function(x, digits = 3L, caption = NULL) {
+  numeric_columns <- vapply(x, is.numeric, logical(1L))
+  x[numeric_columns] <- lapply(x[numeric_columns], function(z) round(z, digits))
+  knitr::kable(x, caption = caption, row.names = FALSE)
+}
+
+metric_at <- function(protein, plddt, trials = 1000L) {
+  run_metrics[
+    run_metrics$protein == protein &
+      run_metrics$plddt_threshold == plddt &
+      run_metrics$n_sim == trials,
+    , drop = FALSE
+  ]
+}
+```
+
+## Experiment completeness {.unnumbered}
+
+The expected design is 5 proteins × 3 pLDDT thresholds × 10 trial counts = 150
+configurations. This cell confirms that the expected saved result objects exist.
+
+```{r experiment-completeness}
+experiment_status <- data.frame(
+  Measure = c(
+    "Configured runs", "Available result objects", "Available manifests",
+    "Trial levels", "pLDDT levels"
+  ),
+  Value = c(
+    nrow(config),
+    sum(file.exists(file.path(config$results_dir, "GRIN3D_mutation_hotspot_results.rds"))),
+    sum(file.exists(file.path(config$results_dir, "stability_run_manifest.csv"))),
+    paste(sort(unique(config$n_sim)), collapse = ", "),
+    paste(sort(unique(config$plddt_threshold)), collapse = ", ")
+  )
+)
+display_table(experiment_status)
+```
+
+# Results at 1,000 trials
+
+This table is the compact numerical summary of the experiment. `Residues` and
+`Events` show retained/total counts. Mean Jaccard compares each condition's
+candidate clusters with the unfiltered 1,000-trial cluster landscape for the
+same protein.
+
+```{r maximum-trial-results}
+maximum_results <- run_metrics[run_metrics$n_sim == 1000, ]
+maximum_results <- maximum_results[
+  order(match(maximum_results$protein, c("TP53", "PTEN", "SUZ12", "EZH2", "LEF1")),
+        maximum_results$plddt_threshold),
+]
+
+maximum_display <- data.frame(
+  Protein = maximum_results$protein,
+  pLDDT = maximum_results$plddt_threshold,
+  Residues = paste0(maximum_results$eligible_residues, "/", maximum_results$total_coordinate_residues),
+  Events = paste0(maximum_results$mapped_events, "/",
+                  maximum_results$mapped_events + maximum_results$excluded_events),
+  Subjects = maximum_results$mapped_subjects,
+  Clusters = maximum_results$n_clusters,
+  Significant = maximum_results$n_significant,
+  `Mean Jaccard` = maximum_results$mean_best_jaccard,
+  `Median Jaccard` = maximum_results$median_best_jaccard,
+  check.names = FALSE
+)
+display_table(maximum_display, caption = "Results at the maximum evaluated trial count")
+```
+
+## Joint p-values at 1,000 trials
+
+The hotspot model reports `p_any_joint`, the final empirical p-value after
+accounting for the search across cluster sizes, subject-count thresholds, and
+the 1D and 3D cluster trees. The table below summarizes these corrected values;
+the minimum identifies the strongest candidate in each condition, while the
+median describes the full set of candidate clusters rather than only the
+significant tail.
+
+```{r joint-pvalues-1000}
+pvalue_1000 <- pvalue_clusters[pvalue_clusters$n_sim == 1000, ]
+pvalue_groups <- split(
+  pvalue_1000,
+  interaction(pvalue_1000$protein, pvalue_1000$plddt_threshold, drop = TRUE)
+)
+
+pvalue_summary <- do.call(rbind, lapply(pvalue_groups, function(x) {
+  data.frame(
+    Protein = x$protein[1],
+    pLDDT = x$plddt_threshold[1],
+    Clusters = nrow(x),
+    `Minimum joint p` = min(x$p_any_joint, na.rm = TRUE),
+    `Median joint p` = median(x$p_any_joint, na.rm = TRUE),
+    `Clusters p <= 0.05` = sum(x$p_any_joint <= 0.05, na.rm = TRUE),
+    `Clusters p <= 0.01` = sum(x$p_any_joint <= 0.01, na.rm = TRUE),
+    check.names = FALSE
+  )
+}))
+pvalue_summary <- pvalue_summary[
+  order(match(pvalue_summary$Protein, c("TP53", "PTEN", "SUZ12", "EZH2", "LEF1")),
+        pvalue_summary$pLDDT),
+]
+rownames(pvalue_summary) <- NULL
+
+display_table(
+  pvalue_summary,
+  digits = 5L,
+  caption = "Final joint empirical p-values at 1,000 trials"
+)
+```
+
+At 1,000 trials, the numbers of corrected significant clusters at pLDDT
+0/70/90 are **11/6/6 for TP53**, **0/0/0 for PTEN**, **0/0/2 for SUZ12**,
+**0/25/9 for EZH2**, and **9/6/1 for LEF1**. None of the final joint p-values
+is at or below 0.01.
+Thus, TP53 supplies the clearest unfiltered positive-control signal, PTEN has
+no corrected evidence of clustering under these settings, SUZ12 and EZH2
+findings are specific to confidence-filtered residue cohorts, and LEF1 retains
+corrected clustering evidence in all three cohorts.
+
+With 1,000 total simulations, the analysis uses 500 evaluation simulations,
+so the smallest possible uncorrected evaluation p-value is approximately
+`r sprintf("%.5f", 1 / 501)`. The observed `p_any_joint` values are larger
+because they include the model's search correction; additional trials improve
+precision but do not guarantee that a p-value will decrease.
+
+<div class="caution">
+Filtering does not merely hide low-confidence residues from a fixed result. It
+can exclude mutation events. Comparisons across pLDDT thresholds therefore
+represent related but non-identical mutation cohorts.
+</div>
+
+# TP53: dense positive-control pattern
+
+## TP53 experiment
+
+The following cell extracts TP53's 1,000-trial results and calculates coordinate
+and event retention relative to the unfiltered condition.
+
+```{r tp53-summary}
+tp53 <- maximum_results[maximum_results$protein == "TP53", ]
+tp53$coordinate_fraction <- tp53$eligible_residues / tp53$total_coordinate_residues
+tp53$event_fraction <- tp53$mapped_events / tp53$mapped_events[tp53$plddt_threshold == 0]
+
+display_table(
+  tp53[c(
+    "plddt_threshold", "eligible_residues", "mapped_events", "mapped_subjects",
+    "n_clusters", "n_significant", "coordinate_fraction", "event_fraction",
+    "mean_best_jaccard", "reference_recovery_jaccard_0_8"
+  )],
+  caption = "TP53 structural-confidence sensitivity at 1,000 trials"
+)
+```
+
+At pLDDT ≥70, TP53 retains `r metric_at('TP53', 70)$mapped_events` of
+`r metric_at('TP53', 0)$mapped_events` mutations and has mean cluster Jaccard
+`r sprintf('%.3f', metric_at('TP53', 70)$mean_best_jaccard)`. At pLDDT ≥90,
+it retains `r metric_at('TP53', 90)$mapped_events` mutations and has mean
+Jaccard `r sprintf('%.3f', metric_at('TP53', 90)$mean_best_jaccard)`.
+
+## TP53 p-value and significance convergence
+
+The next figure separates rank stability of empirical p-values from absolute
+p-value error.
+
+```{r tp53-convergence-figures, echo=FALSE}
+knitr::include_graphics(file.path(figure_dir, "TP53_trial_convergence_overview.png"))
+```
+
+**TP53 conclusion:** the exact 1,000-trial significance sets persist from 800
+trials without filtering, 700 trials at pLDDT ≥70, and 900 trials at pLDDT ≥90.
+The membership itself is invariant within each pLDDT stratum.
+
+# PTEN: independent mutation-rich pattern
+
+## PTEN experiment and retained cohort
+
+```{r pten-summary}
+pten <- maximum_results[maximum_results$protein == "PTEN", ]
+pten$coordinate_fraction <- pten$eligible_residues / pten$total_coordinate_residues
+pten$event_fraction <- pten$mapped_events / pten$mapped_events[pten$plddt_threshold == 0]
+
+display_table(
+  pten[c(
+    "plddt_threshold", "eligible_residues", "mapped_events", "mapped_subjects",
+    "n_clusters", "n_significant", "coordinate_fraction", "event_fraction",
+    "mean_best_jaccard", "reference_recovery_jaccard_0_8"
+  )],
+  caption = "PTEN structural-confidence sensitivity at 1,000 trials"
+)
+```
+
+At pLDDT ≥70, PTEN retains `r metric_at('PTEN', 70)$mapped_events` of
+`r metric_at('PTEN', 0)$mapped_events` mutations and has mean cluster Jaccard
+`r sprintf('%.3f', metric_at('PTEN', 70)$mean_best_jaccard)`. At pLDDT ≥90,
+it retains `r metric_at('PTEN', 90)$mapped_events` mutations and has mean
+Jaccard `r sprintf('%.3f', metric_at('PTEN', 90)$mean_best_jaccard)`.
+
+## PTEN p-value and significance convergence
+
+```{r pten-convergence-figure, echo=FALSE}
+knitr::include_graphics(file.path(figure_dir, "PTEN_trial_convergence_overview.png"))
+```
+
+**PTEN conclusion:** membership is invariant across trial counts at each fixed
+threshold. PTEN is also comparatively robust to confidence filtering: mean
+Jaccard is `r sprintf('%.3f', metric_at('PTEN', 70)$mean_best_jaccard)` at
+pLDDT ≥70 and `r sprintf('%.3f', metric_at('PTEN', 90)$mean_best_jaccard)` at
+pLDDT ≥90. No corrected significant clusters occur in any evaluated PTEN
+condition. Its exact empty significance sets therefore represent trivial
+agreement, not positive evidence of significance convergence.
+
+# SUZ12: sparse mutation pattern
+
+## SUZ12 experiment and retained cohort
+
+```{r suz12-summary}
+suz12 <- maximum_results[maximum_results$protein == "SUZ12", ]
+suz12$coordinate_fraction <- suz12$eligible_residues / suz12$total_coordinate_residues
+suz12$event_fraction <- suz12$mapped_events / suz12$mapped_events[suz12$plddt_threshold == 0]
+
+display_table(
+  suz12[c(
+    "plddt_threshold", "eligible_residues", "mapped_events", "mapped_subjects",
+    "n_clusters", "n_significant", "coordinate_fraction", "event_fraction",
+    "mean_best_jaccard", "reference_recovery_jaccard_0_8"
+  )],
+  caption = "SUZ12 structural-confidence sensitivity at 1,000 trials"
+)
+```
+
+## SUZ12 trial convergence
+
+```{r suz12-convergence-figures, echo=FALSE}
+knitr::include_graphics(file.path(figure_dir, "SUZ12_trial_convergence_overview.png"))
+```
+
+**SUZ12 conclusion:** within-threshold membership is exact across trial counts.
+The pLDDT ≥90 condition has a much lower mean Jaccard than the unfiltered
+reference and first matches the final significance set only at the 1,000-trial
+endpoint, so its statistical stability remains unresolved.
+
+# EZH2: sparse mutation pattern
+
+## EZH2 experiment and retained cohort
+
+```{r ezh2-summary}
+ezh2 <- maximum_results[maximum_results$protein == "EZH2", ]
+ezh2$coordinate_fraction <- ezh2$eligible_residues / ezh2$total_coordinate_residues
+ezh2$event_fraction <- ezh2$mapped_events / ezh2$mapped_events[ezh2$plddt_threshold == 0]
+
+display_table(
+  ezh2[c(
+    "plddt_threshold", "eligible_residues", "mapped_events", "mapped_subjects",
+    "n_clusters", "n_significant", "coordinate_fraction", "event_fraction",
+    "mean_best_jaccard", "reference_recovery_jaccard_0_8"
+  )],
+  caption = "EZH2 structural-confidence sensitivity at 1,000 trials"
+)
+```
+
+## EZH2 trial convergence
+
+```{r ezh2-convergence-figures, echo=FALSE}
+knitr::include_graphics(file.path(figure_dir, "EZH2_trial_convergence_overview.png"))
+```
+
+**EZH2 conclusion:** within-threshold membership is exact across trial counts.
+The pLDDT ≥70 significance set first equals the final result only at the
+1,000-trial endpoint and therefore requires additional trials. The pLDDT ≥90
+set persists from 600 trials, but it represents a substantially reduced event
+cohort.
+
+# LEF1: sparse mutation pattern
+
+## LEF1 experiment and retained cohort
+
+```{r lef1-summary}
+lef1 <- maximum_results[maximum_results$protein == "LEF1", ]
+lef1$coordinate_fraction <- lef1$eligible_residues / lef1$total_coordinate_residues
+lef1$event_fraction <- lef1$mapped_events / lef1$mapped_events[lef1$plddt_threshold == 0]
+
+display_table(
+  lef1[c(
+    "plddt_threshold", "eligible_residues", "mapped_events", "mapped_subjects",
+    "n_clusters", "n_significant", "coordinate_fraction", "event_fraction",
+    "mean_best_jaccard", "reference_recovery_jaccard_0_8"
+  )],
+  caption = "LEF1 structural-confidence sensitivity at 1,000 trials"
+)
+```
+
+## LEF1 trial convergence
+
+```{r lef1-convergence-figures, echo=FALSE}
+knitr::include_graphics(file.path(figure_dir, "LEF1_trial_convergence_overview.png"))
+```
+
+**LEF1 conclusion:** candidate membership is invariant across trial counts at
+each threshold, and all three 1,000-trial significance sets persist from 900
+trials. The unfiltered analysis contains nine significant candidates, compared
+with six at pLDDT ≥70 and one at pLDDT ≥90. Confidence filtering changes the
+cluster landscape substantially (mean Jaccard `r sprintf('%.3f', metric_at('LEF1', 70)$mean_best_jaccard)`
+at ≥70 and `r sprintf('%.3f', metric_at('LEF1', 90)$mean_best_jaccard)` at ≥90)
+because only 27 and 26 of the original 50 events remain. The convergence result
+is therefore encouraging within each threshold, but filtered and unfiltered
+LEF1 results should be interpreted as different mutation cohorts.
+
+# Cross-protein interpretation
+
+## Interactive cluster stability explorer
+
+Use the controls below to compare the strongest candidate clusters for each
+protein and pLDDT threshold. The matrix tracks corrected joint p-values across
+trial counts. Its rows do not change within a pLDDT threshold because observed
+cluster construction is deterministic; changes in color show Monte Carlo
+p-value convergence. Clicking a cell links that candidate to its best
+residue-overlap match at pLDDT 0, 70, and 90, revealing how structural filtering
+changes cluster membership. The residue-track comparison uses the 1,000-trial
+candidate sets, and the matrix can display up to the 40 strongest candidates
+ranked at 1,000 trials.
+
+```{r interactive-cluster-explorer, echo=FALSE, results='asis'}
+source(file.path(analysis_root, "interactive_cluster_explorer.R"))
+explorer_html <- build_cluster_explorer(
+  pvalue_clusters = pvalue_clusters,
+  run_metrics = run_metrics,
+  template_file = file.path(analysis_root, "interactive_cluster_explorer.html")
+)
+cat("```{=html}\n", explorer_html, "\n```\n", sep = "")
+```
+
+## Cluster membership sensitivity
+
+This figure puts all proteins on the same scale. Within each threshold, the
+line is flat across trial counts because cluster construction precedes null
+calibration. Differences between pLDDT lines quantify structural-filtering
+sensitivity.
+
+```{r global-sensitivity, echo=FALSE, out.width='100%'}
+knitr::include_graphics(file.path(
+  figure_dir,
+  paste0(c("TP53", "PTEN", "SUZ12", "EZH2", "LEF1"), "_global_sensitivity.png")
+))
+```
+
+## P-value rank and significance-set convergence
+
+Spearman correlation measures whether clusters retain the same p-value ranking
+as the 1,000-trial result at the same pLDDT. Exact significance-set matching is
+stricter: every corrected significant cluster must agree.
+
+```{r earliest-significance-table}
+earliest_display <- earliest
+names(earliest_display) <- c(
+  "Protein", "pLDDT", "Earliest persistent exact match",
+  "Significant clusters at 1,000", "Interpretation"
+)
+display_table(earliest_display)
+```
+
+A match first reached at exactly 1,000 trials cannot demonstrate persistence,
+because no later evaluated trial count exists. Conditions with zero significant
+clusters have trivial agreement on an empty set rather than positive evidence
+of statistical convergence.
+
+## Do p-values decrease as trials increase?
+
+Not necessarily. For `B` evaluation simulations and `b` null outcomes at least
+as extreme as the observed cluster, the empirical estimate is approximately
+`p = (1 + b) / (1 + B)`. Adding simulations increases both the possible
+denominator and the opportunity to observe additional extreme null outcomes.
+An individual p-value can therefore decrease, increase, or remain unchanged.
+
+What reliably improves is **resolution**. GRIN3D reserves half of each run for
+evaluation, so the smallest attainable evaluation p-value becomes progressively
+smaller as the total trial count rises.
+
+```{r empirical-pvalue-resolution}
+resolution <- unique(run_metrics[c(
+  "n_sim", "n_evaluation", "minimum_empirical_p"
+)])
+resolution <- resolution[order(resolution$n_sim), ]
+names(resolution) <- c("Total trials", "Evaluation trials", "Minimum empirical p")
+display_table(resolution, digits = 5L,
+              caption = "Monte Carlo resolution available at each trial count")
+```
+
+```{r empirical-pvalue-resolution-plot, fig.width=8, fig.height=4.5}
+plot(
+  resolution$`Total trials`, resolution$`Minimum empirical p`,
+  type = "b", pch = 19, lwd = 2, col = "#2166AC", log = "y",
+  xlab = "Total null-simulation trials",
+  ylab = "Minimum attainable empirical p-value",
+  main = "Increasing trials improves small-p-value resolution"
+)
+grid()
+```
+
+The next cell directly compares every candidate cluster's 100-trial p-value
+with its p-value in the 1,000-trial reference at the same protein and pLDDT.
+This demonstrates that decreasing p-values are common—especially for the
+strongest clusters—but are not a mathematical requirement.
+
+```{r pvalue-direction-100-vs-1000}
+initial_pvalues <- pvalue_clusters[pvalue_clusters$n_sim == 100, ]
+delta <- initial_pvalues$reference_p_any_joint - initial_pvalues$p_any_joint
+initial_pvalues$direction <- ifelse(
+  delta < -1e-12, "Lower at 1,000",
+  ifelse(delta > 1e-12, "Higher at 1,000", "Unchanged")
+)
+
+direction_groups <- split(
+  initial_pvalues,
+  interaction(initial_pvalues$protein, initial_pvalues$plddt_threshold, drop = TRUE)
+)
+direction_summary <- do.call(rbind, lapply(direction_groups, function(z) {
+  counts <- table(factor(
+    z$direction,
+    levels = c("Lower at 1,000", "Higher at 1,000", "Unchanged")
+  ))
+  data.frame(
+    Protein = z$protein[[1L]], pLDDT = z$plddt_threshold[[1L]],
+    `Lower at 1,000` = unname(counts[[1L]]),
+    `Higher at 1,000` = unname(counts[[2L]]),
+    Unchanged = unname(counts[[3L]]),
+    `Total clusters` = nrow(z), check.names = FALSE
+  )
+}))
+direction_summary <- direction_summary[
+  order(match(direction_summary$Protein, c("TP53", "PTEN", "SUZ12", "EZH2", "LEF1")),
+        direction_summary$pLDDT),
+]
+display_table(direction_summary,
+              caption = "Direction of p-value change from 100 to 1,000 trials")
+```
+
+```{r pvalue-direction-overall}
+overall_direction <- table(factor(
+  initial_pvalues$direction,
+  levels = c("Lower at 1,000", "Higher at 1,000", "Unchanged")
+))
+significant_reference <- initial_pvalues[initial_pvalues$reference_significant_any, ]
+significant_direction <- table(factor(
+  significant_reference$direction,
+  levels = c("Lower at 1,000", "Higher at 1,000", "Unchanged")
+))
+
+pvalue_direction_conclusion <- data.frame(
+  Comparison = c("All candidate clusters", "Significant in the 1,000-trial reference"),
+  `Lower at 1,000` = c(overall_direction[[1L]], significant_direction[[1L]]),
+  `Higher at 1,000` = c(overall_direction[[2L]], significant_direction[[2L]]),
+  Unchanged = c(overall_direction[[3L]], significant_direction[[3L]]),
+  check.names = FALSE
+)
+display_table(pvalue_direction_conclusion)
+```
+
+Across all conditions, `r overall_direction[[1L]]` cluster estimates were lower
+at 1,000 trials, `r overall_direction[[2L]]` were higher, and
+`r overall_direction[[3L]]` were unchanged. All
+`r nrow(significant_reference)` cluster instances significant in their
+1,000-trial reference had lower p-values than at 100 trials. Thus the strongest
+signals benefited from added resolution, while the full collection demonstrates
+that monotonic reduction is not a general rule.
+
+<div class="callout">
+**Interpretation.** Increasing trials refines the null estimate and permits
+smaller measurable p-values. It does not create new observed clusters, and it
+does not guarantee that every p-value moves downward. The relevant objective is
+convergence of p-values and significance decisions, not monotonic reduction.
+</div>
+
+# Recommendations
+
+1. Treat observed cluster membership as reproducible candidate generation when
+   the structural input and pLDDT threshold are fixed.
+2. Report empirical p-values separately from cluster membership. Trial count
+   changes Monte Carlo resolution even when cluster residues are unchanged.
+3. Use pLDDT ≥70 as a sensitivity analysis and report retained residues,
+   mutations, and subjects alongside every filtered result.
+4. Use pLDDT ≥90 as a stringent stress test, not an automatically preferred
+   primary analysis.
+5. Do not treat a significance set that appears for the first time at 1,000
+   trials as converged. Extend those conditions beyond 1,000 trials.
+6. Repeat final analyses with independent random seeds to measure Monte Carlo
+   variability; the present nested fixed-seed runs measure resolution behavior.
+7. Keep biological annotation as a separate evidence layer from statistical
+   significance.
+
+<div class="callout">
+**Handoff summary.** The prototype is ready for documented exploratory hotspot
+discovery and sensitivity evaluation. The evidence does not yet support treating
+every corrected significance call as final, especially where convergence is
+first observed only at the 1,000-trial endpoint or confidence filtering removes
+a large portion of the event cohort.
+</div>
+
+# Reproduction and source files
+
+The simulation results are already saved. To regenerate only this notebook:
+
+```{bash, eval=FALSE}
+conda run -n kids26-team13 Rscript -e \
+  'rmarkdown::render("analysis/mutation_plddt_trials/mutation_plddt_trials_report.Rmd")'
+```
+
+Primary files used by the notebook:
+
+- `configurations.csv`: declared experiment grid and input paths;
+- `results/summary/run_metrics.csv`: one row per configuration;
+- `results/summary/trial_convergence_metrics.csv`: p-value convergence metrics;
+- `results/summary/cluster_pvalue_convergence.csv`: cluster-level p-value trajectories;
+- `results/summary/earliest_significance_convergence.csv`: exact-set stability;
+- `results/figures/`: precomputed overlap and convergence figures.
+
+TP53 structural-confidence source:
+
+- AlphaFold DB entry: <https://alphafold.ebi.ac.uk/entry/P04637>
+- AlphaFold confidence documentation: <https://alphafold.ebi.ac.uk/faq>
+- Local model: `examples/TP53_mutations/input_files/AF-P04637-F1-model_v6.pdb`
+- Local metadata: `examples/TP53_mutations/input_files/alphafold_P04637_metadata.json`
+
+PTEN structural-confidence source:
+
+- AlphaFold DB accession: `AF-P60484-F1-model_v6`
+- Local model: `examples/PTEN_CNA/input_files/AF-P60484-F1-model_v6.pdb`
+- Mutation provenance: `examples/PTEN_mutations/input_files/mutation_input_provenance.txt`
+
+LEF1 structural-confidence source:
+
+- UniProt accession: `Q9UJU2` (399-residue canonical protein)
+- RefSeq protein: `NP_057353.1`
+- Local model: `examples/LEF1_mutations/input_files/AF-Q9UJU2-F1-model_v6.pdb`
+- Mutation provenance: `examples/LEF1_mutations/input_files/mutation_input_provenance.txt`

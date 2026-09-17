@@ -1,0 +1,11 @@
+source=datasets/T_ALL_public_data/mutations_dataset.xlsx
+source_fields=gene,sample,variantID,aa_change,mutation_class,ExonicFunc,validation,quality.MULTI
+coordinate_rule=first affected residue; explicit amino-acid deletion/substitution ranges retain both endpoints
+gene=EZH2
+included_rows=95
+excluded_without_resolvable_aa_position=4
+refseq_transcript=NM_001203247
+refseq_protein=NP_001190176.1
+uniprot_accession=Q15910
+coordinate_source=AlphaFold_DB_AF-Q15910-F1-model_v6.pdb
+sequence_validation=NP_001190176.1 exactly matches UniProt Q15910 (746 residues)
