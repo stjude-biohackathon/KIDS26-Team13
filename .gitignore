@@ -156,3 +156,10 @@ dmypy.json
 .pyre/
 .myenv/
 requirements.txt
+
+# Viewer build output: copies of the AlphaFold models used when deploying
+visualization/data/structures/
+# Annotation build output the app never reads (large)
+visualization/data/annotations/*/cluster_residue_annotations.csv
+visualization/data/annotations/*/raw/
+rsconnect/
