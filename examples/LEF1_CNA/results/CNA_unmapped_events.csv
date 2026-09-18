@@ -1,0 +1,16 @@
+"event_id","subject_id","cna_type","chrom","genomic_start","genomic_end","input_row","width_bp","coding_overlap_bp","coding_fraction","n_affected_exons","affected_exon_orders","affected_transcript_exon_ranks","affected_exon_ids","exon_start","exon_end","n_coding_residues","residue_fraction_exon_proxy","complete_structural_mapping","structurally_localizable","localization_class","covers_ge_50pct","covers_ge_75pct","covers_ge_90pct","covers_100pct"
+"CNA_event_000006","PARSLA","HETDEL","4",108101301,108141500,6,40200,0,0,0,"","","",,,0,0,FALSE,FALSE,"no_coding_overlap",FALSE,FALSE,FALSE,FALSE
+"CNA_event_000014","PASILW","HETDEL","4",108117101,108141200,14,24100,0,0,0,"","","",,,0,0,FALSE,FALSE,"no_coding_overlap",FALSE,FALSE,FALSE,FALSE
+"CNA_event_000029","PASRPV","HETDEL","4",108117001,108159300,29,42300,0,0,0,"","","",,,0,0,FALSE,FALSE,"no_coding_overlap",FALSE,FALSE,FALSE,FALSE
+"CNA_event_000049","PATGBY","HETDEL","4",108095301,108153600,49,58300,0,0,0,"","","",,,0,0,FALSE,FALSE,"no_coding_overlap",FALSE,FALSE,FALSE,FALSE
+"CNA_event_000053","PATKVD","HETDEL","4",108095101,108158300,53,63200,0,0,0,"","","",,,0,0,FALSE,FALSE,"no_coding_overlap",FALSE,FALSE,FALSE,FALSE
+"CNA_event_000062","PATYWV","HETDEL","4",108145201,108158300,62,13100,0,0,0,"","","",,,0,0,FALSE,FALSE,"no_coding_overlap",FALSE,FALSE,FALSE,FALSE
+"CNA_event_000068","PAUBTC","HETDEL","4",108117001,108141600,68,24600,0,0,0,"","","",,,0,0,FALSE,FALSE,"no_coding_overlap",FALSE,FALSE,FALSE,FALSE
+"CNA_event_000073","PAUEUC","HETDEL","4",108112801,108160500,73,47700,0,0,0,"","","",,,0,0,FALSE,FALSE,"no_coding_overlap",FALSE,FALSE,FALSE,FALSE
+"CNA_event_000086","PAUMIB","HETDEL","4",108121101,108149500,86,28400,0,0,0,"","","",,,0,0,FALSE,FALSE,"no_coding_overlap",FALSE,FALSE,FALSE,FALSE
+"CNA_event_000103","PAVBFC","HETDEL","4",108141501,108158300,103,16800,0,0,0,"","","",,,0,0,FALSE,FALSE,"no_coding_overlap",FALSE,FALSE,FALSE,FALSE
+"CNA_event_000109","PAVHGX","HETDEL","4",108166101,108167300,109,1200,0,0,0,"","","",,,0,0,FALSE,FALSE,"no_coding_overlap",FALSE,FALSE,FALSE,FALSE
+"CNA_event_000111","PAVKCV","HETDEL","4",108101301,108141500,111,40200,0,0,0,"","","",,,0,0,FALSE,FALSE,"no_coding_overlap",FALSE,FALSE,FALSE,FALSE
+"CNA_event_000118","PAVNGZ","HETDEL","4",108158301,108160500,118,2200,0,0,0,"","","",,,0,0,FALSE,FALSE,"no_coding_overlap",FALSE,FALSE,FALSE,FALSE
+"CNA_event_000127","PAVYAZ","HETDEL","4",108117001,108141600,127,24600,0,0,0,"","","",,,0,0,FALSE,FALSE,"no_coding_overlap",FALSE,FALSE,FALSE,FALSE
+"CNA_event_000128","PAVYGR","HETDEL","4",108112901,108149700,128,36800,0,0,0,"","","",,,0,0,FALSE,FALSE,"no_coding_overlap",FALSE,FALSE,FALSE,FALSE
