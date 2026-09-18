@@ -1,0 +1,18 @@
+"protein","source","alteration_type","cluster_id","hotspot_class","n_subjects","n_events","n_residues","diameter_1d","diameter_3d","p_1d_size","p_3d_size","p_1d_joint","p_3d_joint","p_any_joint","significant_any","exons","significant_1d","significant_3d","p_1d_protein","p_3d_protein","tree_sources","residue_min","residue_max","mean_plddt"
+"CDKN2A","cna","HOMDEL","HOMDEL_cluster_0001","Weak clustering evidence",33,35,153,1,4.66314637749934,0.240751849630074,0.240751849630074,0.604879024195161,0.604879024195161,0.604879024195161,FALSE,"1;2",FALSE,FALSE,0.604879024195161,0.604879024195161,"1D;3D",1,153,75
+"CDKN2A","cna","HOMDEL","HOMDEL_cluster_0002","Weak clustering evidence",34,36,156,2,53.4735209148941,1,1,1,1,1,FALSE,"1;2;3",FALSE,FALSE,1,1,"1D;3D",1,156,74.6
+"CDKN2A","cna","HOMDEL","HOMDEL_cluster_0003","Single-exon recurrence assessed separately",23,23,50,0,0,NA,NA,NA,NA,NA,FALSE,"1",FALSE,FALSE,NA,NA,"1D;3D",1,50,75.5
+"CDKN2A","cna","HOMDEL","HOMDEL_cluster_0004","Single-exon recurrence assessed separately",17,17,103,0,0,NA,NA,NA,NA,NA,FALSE,"2",FALSE,FALSE,NA,NA,"1D;3D",51,153,76.6
+"CDKN2A","cna","HOMDEL","HOMDEL_cluster_0005","Single-exon recurrence assessed separately",13,13,4,0,0,NA,NA,NA,NA,NA,FALSE,"3",FALSE,FALSE,NA,NA,"1D;3D",153,156,59.2
+"CDKN2A","cna","HETDEL","HETDEL_cluster_0001","Weak clustering evidence",28,28,153,1,4.66314637749934,0.366726654669066,0.366726654669066,0.629674065186963,0.629674065186963,0.629674065186963,FALSE,"1;2",FALSE,FALSE,0.629674065186963,0.629674065186963,"1D;3D",1,153,75
+"CDKN2A","cna","HETDEL","HETDEL_cluster_0002","Weak clustering evidence",32,34,156,2,53.4735209148941,1,1,1,1,1,FALSE,"1;2;3",FALSE,FALSE,1,1,"1D;3D",1,156,74.6
+"CDKN2A","cna","HETDEL","HETDEL_cluster_0003","Single-exon recurrence assessed separately",13,13,50,0,0,NA,NA,NA,NA,NA,FALSE,"1",FALSE,FALSE,NA,NA,"1D;3D",1,50,75.5
+"CDKN2A","cna","HETDEL","HETDEL_cluster_0004","Single-exon recurrence assessed separately",19,19,103,0,0,NA,NA,NA,NA,NA,FALSE,"2",FALSE,FALSE,NA,NA,"1D;3D",51,153,76.6
+"CDKN2A","cna","HETDEL","HETDEL_cluster_0005","Single-exon recurrence assessed separately",19,19,4,0,0,NA,NA,NA,NA,NA,FALSE,"3",FALSE,FALSE,NA,NA,"1D;3D",153,156,59.2
+"CDKN2A","cna","GAIN","GAIN_cluster_0001","Weak clustering evidence",2,2,106,1,27.0584563101887,0.971405718856229,0.971405718856229,0.967606478704259,0.967606478704259,0.967606478704259,FALSE,"2;3",FALSE,FALSE,0.967606478704259,0.967606478704259,"1D;3D",51,156,76.1
+"CDKN2A","cna","GAIN","GAIN_cluster_0002","Single-exon recurrence assessed separately",2,2,103,0,0,NA,NA,NA,NA,NA,FALSE,"2",FALSE,FALSE,NA,NA,"1D;3D",51,153,76.6
+"CDKN2A","cna","ALL_CNA","ALL_CNA_cluster_0001","Weak clustering evidence",45,65,153,1,4.66314637749934,0.477304539092182,0.477304539092182,0.813637272545491,0.813637272545491,0.813637272545491,FALSE,"1;2",FALSE,FALSE,0.813637272545491,0.813637272545491,"1D;3D",1,153,75
+"CDKN2A","cna","ALL_CNA","ALL_CNA_cluster_0002","Weak clustering evidence",46,72,156,2,53.4735209148941,1,1,1,1,1,FALSE,"1;2;3",FALSE,FALSE,1,1,"1D;3D",1,156,74.6
+"CDKN2A","cna","ALL_CNA","ALL_CNA_cluster_0003","Single-exon recurrence assessed separately",36,36,50,0,0,NA,NA,NA,NA,NA,FALSE,"1",FALSE,FALSE,NA,NA,"1D;3D",1,50,75.5
+"CDKN2A","cna","ALL_CNA","ALL_CNA_cluster_0004","Single-exon recurrence assessed separately",38,38,103,0,0,NA,NA,NA,NA,NA,FALSE,"2",FALSE,FALSE,NA,NA,"1D;3D",51,153,76.6
+"CDKN2A","cna","ALL_CNA","ALL_CNA_cluster_0005","Single-exon recurrence assessed separately",33,33,4,0,0,NA,NA,NA,NA,NA,FALSE,"3",FALSE,FALSE,NA,NA,"1D;3D",153,156,59.2

@@ -1,0 +1,3 @@
+"cluster_id","event_id","subject_id","loc_start","loc_end","span_aa","affected_residues_in_cluster"
+"cluster_0001","2","PAUKTD",327,327,1,"327"
+"cluster_0001","3","PAUPXU",149,149,1,"149"

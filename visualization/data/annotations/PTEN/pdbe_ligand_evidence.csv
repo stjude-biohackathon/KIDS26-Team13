@@ -1,0 +1,4 @@
+"protein","uniprot_accession","ligand_code","ligand_name","contact_residues","pdb_ids","chembl_id","drugbank_id","cofactor_id","reaction_id","is_solvent","evidence_scope","source_url","retrieved_at_utc"
+"PTEN","P60484","VO4","VANADATE ION","124;125;126;127;128;129;130;131","5BZX","","","","",FALSE,"residue_level_experimental_contact","https://www.ebi.ac.uk/pdbe/pdbe-kb/proteins/P60484","2026-09-17T05:13:46Z"
+"PTEN","P60484","TLA","L(+)-TARTARIC ACID","92;93;124;125;126;127;128;129;130;131;171","1D5R;5BUG;5BZX;5BZZ","","","","",FALSE,"residue_level_experimental_contact","https://www.ebi.ac.uk/pdbe/pdbe-kb/proteins/P60484","2026-09-17T05:13:46Z"
+"PTEN","P60484","PO4","PHOSPHATE ION","73;74;75;332","7JUK;7JVX","","","","",FALSE,"residue_level_experimental_contact","https://www.ebi.ac.uk/pdbe/pdbe-kb/proteins/P60484","2026-09-17T05:13:46Z"

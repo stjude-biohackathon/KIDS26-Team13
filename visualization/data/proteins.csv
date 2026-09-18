@@ -1,0 +1,8 @@
+"protein","uniprot","pdb_file","types"
+"CDKN2A","P42771","examples/PTEN_CNA/input_files/AF-P42771-F1-model_v6.pdb","HOMDEL;ALL_CNA;HETDEL;GAIN"
+"FBXW7","Q969H0","examples/FBXW7_mutations/input_files/AF-Q969H0-F1-model_v6.pdb","SNV;INDEL"
+"IL7R","P16871","examples/IL7R_mutations/input_files/AF-P16871-F1-model_v6.pdb","SNV;INDEL"
+"JAK3","P52333","examples/JAK3_mutations/input_files/AF-P52333-F1-model_v6.pdb","SNV;INDEL"
+"LEF1","Q9UJU2","examples/LEF1_CNA/input_files/AF-Q9UJU2-F1-model_v6.pdb","SNV;INDEL;HETDEL;ALL_CNA;HOMDEL"
+"PTEN","P60484","examples/PTEN_CNA/input_files/AF-P60484-F1-model_v6.pdb","SNV;INDEL;HOMDEL;GAIN;ALL_CNA;HETDEL"
+"TP53","P04637","examples/TP53_mutations/input_files/AF-P04637-F1-model_v6.pdb","SNV;INDEL"
