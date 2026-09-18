@@ -50,6 +50,11 @@ build_cluster_explorer <- function(
       residues = x$residues,
       subjects = x$n_subjects,
       events = x$n_events,
+      paeMedian = x$pae_median,
+      paeP90 = x$pae_p90,
+      paeMax = x$pae_max,
+      paeReliableFraction = x$pae_reliable_pair_fraction,
+      paeSupported = x$pae_supported,
       p = x$p_any_joint,
       significant = x$significant_any,
       stringsAsFactors = FALSE

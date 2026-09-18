@@ -14,6 +14,10 @@
 #   plddt and opportunity are optional. Set confidence = "plddt" to apply the
 #   min.confidence filter. Set opportunity to a residue-weight column to use a
 #   nonuniform positional null.
+# AlphaFold PAE JSON file (optional):
+#   The predicted_aligned_error matrix downloaded for the same AlphaFold model.
+#   PAE is summarized after statistical calibration and does not change the
+#   candidate clusters, null simulations or p-values.
 #   this file can be generated for selected proteins using GRIN3D_exon_to_protein_download_alphafold.R script
 #
 # This is an initial single-protein proof of concept. Without an opportunity
@@ -95,7 +99,9 @@
 #    - affected subjects, events and residues;
 #    - 1D sequence diameter and 3D structural diameter;
 #    - size-specific, protein-wide and joint empirical p-values;
-#    - significance indicators and hotspot classification.
+#    - significance indicators and hotspot classification;
+#    - optional within-cluster PAE support metrics, kept separate from
+#      statistical significance.
 #
 # 2. mutation_hotspot_cluster_members.csv
 #    Lists the mutation events and subjects contributing to each cluster,
@@ -149,9 +155,15 @@
 # Display the default required and optional columns for both input files.
 grin3d_mutation_input_spec <- function() {
   data.frame(
-    input_file = c("Mutation lesions", "AlphaFold C-alpha coordinates"),
-    required_columns = c("ID, start, end", "residue, x, y, z"),
-    optional_columns = c("unique event ID, such as id", "plddt, opportunity"),
+    input_file = c(
+      "Mutation lesions", "AlphaFold C-alpha coordinates", "AlphaFold PAE"
+    ),
+    required_columns = c(
+      "ID, start, end", "residue, x, y, z", "predicted_aligned_error JSON matrix"
+    ),
+    optional_columns = c(
+      "unique event ID, such as id", "plddt, opportunity", "entire file is optional"
+    ),
     stringsAsFactors = FALSE
   )
 }
@@ -341,6 +353,112 @@ as_numeric_column <- function(x, column, object.name) {
 # Collapse unique values into a stable semicolon-separated label.
 collapse_values <- function(x) {
   paste(sort(unique(as.character(x))), collapse = ";")
+}
+
+# Read the square predicted-aligned-error matrix in an AlphaFold DB JSON file.
+# PAE rows and columns use one-based canonical residue positions after import.
+read_alphafold_pae <- function(file, expected.residues = NULL) {
+  if (is.null(file)) return(NULL)
+  if (!file.exists(file)) stop("PAE file does not exist: ", file)
+  if (!requireNamespace("jsonlite", quietly = TRUE)) {
+    stop("Install the R package 'jsonlite' to read AlphaFold PAE JSON files.")
+  }
+
+  payload <- jsonlite::read_json(file, simplifyVector = FALSE)
+  record <- if (
+    is.list(payload) && length(payload) == 1L &&
+      is.list(payload[[1L]]) && !is.null(payload[[1L]]$predicted_aligned_error)
+  ) payload[[1L]] else payload
+
+  values <- record$predicted_aligned_error
+  if (is.null(values) || !is.list(values) || !length(values)) {
+    stop("PAE JSON does not contain a predicted_aligned_error matrix: ", file)
+  }
+  row.lengths <- lengths(values)
+  if (length(unique(row.lengths)) != 1L || row.lengths[[1L]] != length(values)) {
+    stop("predicted_aligned_error must be a square matrix in: ", file)
+  }
+  pae <- do.call(rbind, lapply(values, function(row) {
+    suppressWarnings(as.numeric(unlist(row, use.names = FALSE)))
+  }))
+  if (anyNA(pae) || any(!is.finite(pae)) || any(pae < 0)) {
+    stop("PAE values must be finite, nonmissing and nonnegative in: ", file)
+  }
+  residues <- seq_len(nrow(pae))
+  dimnames(pae) <- list(as.character(residues), as.character(residues))
+
+  if (!is.null(expected.residues)) {
+    expected.residues <- sort(unique(as.integer(expected.residues)))
+    if (anyNA(expected.residues) || any(expected.residues < 1L) ||
+        any(expected.residues > nrow(pae))) {
+      stop(
+        "PAE matrix positions do not cover all structural residue numbers. ",
+        "PAE length: ", nrow(pae), "; structural range: ",
+        paste(range(expected.residues), collapse = "-")
+      )
+    }
+  }
+  pae
+}
+
+# Summarize conservative symmetric PAE within each candidate cluster. AlphaFold
+# PAE is directional, so max(PAE[i,j], PAE[j,i]) is used for each unordered
+# residue pair. These columns are structural-confidence annotations, not
+# statistical p-values and not inputs to the current null model.
+annotate_clusters_with_pae <- function(
+    clusters,
+    pae,
+    cutoff = 10,
+    minimum.reliable.fraction = 0.80) {
+  if (is.null(pae)) return(clusters)
+  if (!is.matrix(pae) || nrow(pae) != ncol(pae)) {
+    stop("pae must be a square numeric matrix.")
+  }
+  if (length(cutoff) != 1L || !is.finite(cutoff) || cutoff < 0) {
+    stop("pae.cutoff must be one finite nonnegative number.")
+  }
+  if (length(minimum.reliable.fraction) != 1L ||
+      !is.finite(minimum.reliable.fraction) ||
+      minimum.reliable.fraction < 0 || minimum.reliable.fraction > 1) {
+    stop("pae.minimum.reliable.fraction must be between 0 and 1.")
+  }
+
+  metrics <- lapply(clusters$residues, function(value) {
+    residues <- suppressWarnings(as.integer(strsplit(
+      as.character(value), ";", fixed = TRUE
+    )[[1L]]))
+    residues <- sort(unique(residues[!is.na(residues)]))
+    if (any(residues < 1L) || any(residues > nrow(pae))) {
+      stop("A cluster contains residues outside the PAE matrix range.")
+    }
+    if (length(residues) < 2L) {
+      return(data.frame(
+        pae_n_pairs = 0L, pae_median = NA_real_, pae_p90 = NA_real_,
+        pae_max = NA_real_, pae_reliable_pair_fraction = NA_real_,
+        pae_supported = NA, pae_interpretation = "singleton_no_pairwise_pae",
+        stringsAsFactors = FALSE
+      ))
+    }
+    directional <- pae[residues, residues, drop = FALSE]
+    symmetric <- pmax(directional, t(directional))
+    pair.values <- symmetric[upper.tri(symmetric)]
+    reliable.fraction <- mean(pair.values <= cutoff)
+    supported <- reliable.fraction >= minimum.reliable.fraction
+    data.frame(
+      pae_n_pairs = length(pair.values),
+      pae_median = stats::median(pair.values),
+      pae_p90 = unname(stats::quantile(pair.values, 0.90, names = FALSE)),
+      pae_max = max(pair.values),
+      pae_reliable_pair_fraction = reliable.fraction,
+      pae_supported = supported,
+      pae_interpretation = if (supported) "pae_supported" else "pae_uncertain",
+      stringsAsFactors = FALSE
+    )
+  })
+  metrics <- do.call(rbind, metrics)
+  metrics$pae_cutoff <- cutoff
+  metrics$pae_minimum_reliable_fraction <- minimum.reliable.fraction
+  cbind(clusters, metrics, stringsAsFactors = FALSE)
 }
 
 
@@ -1230,6 +1348,7 @@ run_grin3d_mutation_hotspots <- function(
     coordinate.file,
     results.dir = "results_mutation_hotspots",
     protein = "protein_of_interest",
+    pae.file = NULL,
     lesion.columns = list(
       subject = "ID",
       event = NULL,
@@ -1249,6 +1368,8 @@ run_grin3d_mutation_hotspots <- function(
     min.subjects = 2L,
     min.events = 2L,
     min.confidence = 70,
+    pae.cutoff = 10,
+    pae.minimum.reliable.fraction = 0.80,
     require.complete.event.mapping = TRUE,
     avoid.within.subject.overlap = TRUE,
     alpha = 0.05,
@@ -1283,12 +1404,24 @@ run_grin3d_mutation_hotspots <- function(
   ) {
     stop("min.confidence must be one finite number when filtering is enabled.")
   }
+  if (!is.null(pae.file) &&
+      (length(pae.cutoff) != 1L || !is.finite(pae.cutoff) || pae.cutoff < 0)) {
+    stop("pae.cutoff must be one finite nonnegative number.")
+  }
+  if (!is.null(pae.file) &&
+      (length(pae.minimum.reliable.fraction) != 1L ||
+       !is.finite(pae.minimum.reliable.fraction) ||
+       pae.minimum.reliable.fraction < 0 || pae.minimum.reliable.fraction > 1)) {
+    stop("pae.minimum.reliable.fraction must be between 0 and 1.")
+  }
 
   analysis.options <- list(
     protein = protein,
     min.subjects = min.subjects,
     min.events = min.events,
     min.confidence = min.confidence,
+    pae.cutoff = pae.cutoff,
+    pae.minimum.reliable.fraction = pae.minimum.reliable.fraction,
     require.complete.event.mapping = require.complete.event.mapping,
     avoid.within.subject.overlap = avoid.within.subject.overlap,
     alpha = alpha,
@@ -1328,6 +1461,15 @@ run_grin3d_mutation_hotspots <- function(
     coordinate.columns,
     min.confidence = analysis.options$min.confidence
   )
+  pae <- read_alphafold_pae(pae.file, expected.residues = coordinates$residue)
+  if (is.null(pae)) {
+    message("No PAE file supplied; cluster PAE support will not be calculated.")
+  } else {
+    message(
+      "Loaded a ", nrow(pae), " x ", ncol(pae),
+      " PAE matrix; support cutoff = ", pae.cutoff, " Angstrom."
+    )
+  }
   events <- prepare_events(lesion.data, lesion.columns)
   mapped <- map_events_to_structure(
     events,
@@ -1390,6 +1532,12 @@ run_grin3d_mutation_hotspots <- function(
   )
 
   cluster.table <- calibrated$clusters
+  cluster.table <- annotate_clusters_with_pae(
+    cluster.table,
+    pae = pae,
+    cutoff = analysis.options$pae.cutoff,
+    minimum.reliable.fraction = analysis.options$pae.minimum.reliable.fraction
+  )
   cluster.table$protein <- analysis.options$protein
   cluster.table <- cluster.table[, c(
     "protein",
@@ -1406,6 +1554,7 @@ run_grin3d_mutation_hotspots <- function(
     settings = list(
       lesion.file = lesion.file,
       coordinate.file = coordinate.file,
+      pae.file = pae.file,
       results.dir = results.dir,
       lesion.columns = lesion.columns,
       coordinate.columns = coordinate.columns,
@@ -1414,6 +1563,7 @@ run_grin3d_mutation_hotspots <- function(
       analysis.options = analysis.options
     ),
     coordinates = coordinates,
+    pae = pae,
     mapped_events = mapped$events,
     excluded_events = mapped$excluded_events,
     event_mapping_summary = mapped$event_mapping_summary,

@@ -1,6 +1,7 @@
-# Mutation hotspot sensitivity to trials and pLDDT
+# Mutation hotspot sensitivity to trials, pLDDT, and PAE
 
-This analysis changes only two inputs to the GRIN3D mutation-hotspot model:
+The statistical sensitivity experiment changes only two inputs to the GRIN3D
+mutation-hotspot model:
 
 1. `n.sim`, the number of null-simulation trials; and
 2. `min.confidence`, the AlphaFold pLDDT cutoff used to retain coordinates.
@@ -9,10 +10,14 @@ All other model settings are fixed in `01_run_sensitivity.R`: seed, mutation
 events, minimum subject/event support, calibration fraction, significance
 threshold, overlap rules, and the uniform positional null.
 
-TP53 is included for trial-count sensitivity, but its current coordinate CSV
-does not contain pLDDT. Its pLDDT threshold is therefore recorded as `NA` and
-is not varied. SUZ12 and EZH2 contain residue-level pLDDT and are evaluated on
-the full factorial grid.
+TP53, PTEN, SUZ12, EZH2, and LEF1 all have AlphaFold v6 coordinates with
+residue-level pLDDT and are evaluated on the full factorial grid.
+
+PAE is added afterward as a separate structural-confidence layer. It does not
+alter observed clusters, the simulated null, or p-values. Within each cluster,
+directional PAE is conservatively symmetrized with the pairwise maximum. The
+primary label requires at least 80% of residue pairs to have PAE <= 10 Å, and
+5/10/15 Å results are retained as a threshold-sensitivity analysis.
 
 ## Run
 
@@ -29,10 +34,13 @@ conda run -n kids26-team13 Rscript \
   analysis/mutation_plddt_trials/03_validate_analysis.R
 
 conda run -n kids26-team13 Rscript \
-  analysis/mutation_plddt_trials/04_analyze_trial_convergence.R
+  analysis/mutation_plddt_trials/06_add_pae_support.R
 
 conda run -n kids26-team13 Rscript \
-  analysis/mutation_plddt_trials/05_build_pdf_report.R
+  analysis/mutation_plddt_trials/04_analyze_trial_convergence.R
+
+conda run -n kids26-team13 Rscript -e \
+  'rmarkdown::render("analysis/mutation_plddt_trials/mutation_plddt_trials_report.Rmd")'
 ```
 
 The `quick` profile uses 100 and 200 trials with pLDDT cutoffs 0, 70, and 90.
@@ -72,7 +80,10 @@ The summary stage produces:
 - `reference_cluster_stability.csv`: cluster-level reproducibility and an
   exploratory priority score;
 - `validation_checks.csv`: automated checks that fixed settings stayed fixed
-  and trial count alone did not change observed membership; and
+  and trial count alone did not change observed membership;
+- `cluster_pae_support.csv`: cluster-level PAE median, p90, maximum, reliable
+  pair fraction, and support label;
+- `pae_cutoff_sensitivity.csv`: support classifications at 5, 10, and 15 Å; and
 - PNG/PDF figures showing global sensitivity, cluster similarity, empirical
   p-value trajectories, residue-level membership, and overlap transitions.
 
@@ -86,8 +97,9 @@ to the 1,000-trial result at the same pLDDT. It reports p-value error, rank
 correlation, significance agreement, and the earliest trial count after which
 the exact significant-cluster set remains equal to the 1,000-trial set.
 
-`05_build_pdf_report.R` creates a curated, self-contained PDF in `report/` from
-the saved summaries. It does not rerun hotspot simulations.
+`06_add_pae_support.R` downloads the matching official AlphaFold DB PAE JSON
+files when absent, records their URLs, annotates completed result objects, and
+creates full-protein PAE heatmaps. It does not rerun hotspot simulations.
 
 The priority score is descriptive, not a statistical test. Biological meaning
 and functional annotation remain separate from hotspot significance.
