@@ -276,6 +276,7 @@ ui <- page_fluid(
     // fields setHoverable would set. Re-armed after every render, because each
     // render builds a new model whose atoms start unarmed.
     var grin3dInfo = {};
+    var grin3dHoverOn = true;
     var NL = String.fromCharCode(10);  // R would turn a backslash-n escape here into a real newline
     // An HTML tooltip rather than a 3Dmol label: 3Dmol draws labels as a single
     // line, and these carry a line per alteration type.
@@ -289,6 +290,7 @@ ui <- page_fluid(
       return tip;
     }
     function grin3dHoverIn(atom, viewer, event) {
+      if (!grin3dHoverOn) return;
       var t = grin3dInfo[atom.resi];
       var tip = grin3dTip();
       tip.innerHTML = '<b>' + (atom.resn ? atom.resn + ' ' : '') + atom.resi + '</b>' +
@@ -328,6 +330,10 @@ ui <- page_fluid(
     function grin3dInit() {
       Shiny.addCustomMessageHandler('grin3d-download', function(id) { document.getElementById(id).click(); });
       Shiny.addCustomMessageHandler('grin3d-hover-data', function(d) { grin3dInfo = d || {}; });
+      Shiny.addCustomMessageHandler('grin3d-hover-enabled', function(on) {
+        grin3dHoverOn = !!on;
+        if (!grin3dHoverOn) grin3dHoverOut();
+      });
       setInterval(grin3dArmHover, 700);
     }
     if (window.Shiny && Shiny.addCustomMessageHandler) grin3dInit();
@@ -358,7 +364,10 @@ ui <- page_fluid(
           tags$details(class = "legend", open = NA,
             tags$summary("Layers"),
             uiOutput("context_key"),
-            uiOutput("layer_controls"))
+            uiOutput("layer_controls"),
+            div(class = "legend-section", style = "border-top:1px solid #E2E4E8; padding-top:8px",
+                input_switch("hover_tips", "Hover details", TRUE),
+                p(class = "hint", "Subjects per residue when you point at the model.")))
         ),
         div(class = "fm-wrap", uiOutput("feature_map"))
       )
@@ -564,6 +573,7 @@ server <- function(input, output, session) {
   })
 
   observe(session$sendCustomMessage("grin3d-hover-data", hover_info(dat(), c(visible(), "ALL_CNA"))))
+  observe(session$sendCustomMessage("grin3d-hover-enabled", isTRUE(input$hover_tips)))
 
   output$structure <- renderR3dmol({
     clusters <- dat()$clusters
