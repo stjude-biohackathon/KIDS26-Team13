@@ -781,7 +781,12 @@ server <- function(input, output, session) {
   })
 
   # Annotations for the selected cluster, or the whole protein when none is selected.
-  output$annotation_table <- renderDT({
+  # server = FALSE: these tables change their column set (a selected cluster shows
+  # "Overlapping residues", the whole protein shows "Position"; only CNA members
+  # have a coding fraction). With server-side processing the browser keeps asking
+  # for the previous table's columns and DataTables raises "column name ... is not
+  # found in data". Both tables are small, so the client holds all the rows.
+  output$annotation_table <- renderDT(server = FALSE, {
     d <- annotation_rows(dat()$ann, selected()$cluster_id)
     if (is.null(d) || !nrow(d)) return(NULL)
     datatable(d, rownames = FALSE, selection = "none", escape = -2, style = "bootstrap5",
@@ -814,7 +819,7 @@ server <- function(input, output, session) {
       ". Annotations add context only; they do not change significance."))
   })
 
-  output$member_table <- renderDT({
+  output$member_table <- renderDT(server = FALSE, {
     s <- req(selected())
     members <- dat()$members
     d <- members[members$cluster_id == s$cluster_id, c("subject_id", "event_type", "detail", "coding_fraction")]
