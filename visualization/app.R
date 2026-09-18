@@ -363,11 +363,34 @@ server <- function(input, output, session) {
     d[order(d$p_any_joint, -d$n_subjects), ]
   })
 
-  selected <- reactive({
+  # The selection is held as a cluster id, not a row index, so hiding a layer or
+  # switching the table view keeps the structure focused on the same cluster
+  # instead of zooming back out. It is cleared only by "Show all layers" or by
+  # changing protein.
+  selected_id <- reactiveVal(NULL)
+  observeEvent(input$cluster_table_rows_selected, {
     i <- input$cluster_table_rows_selected
     d <- table_rows()
-    # the selection can briefly refer to the previous protein's table
-    if (length(i) && i <= nrow(d)) d[i, ] else NULL
+    if (length(i) && i <= nrow(d)) selected_id(d$cluster_id[i])
+  })
+  observeEvent(input$protein, selected_id(NULL))
+
+  selected <- reactive({
+    id <- selected_id()
+    d <- dat()$clusters
+    r <- d[d$cluster_id %in% id, ]
+    if (!nrow(r)) return(NULL)  # the id can briefly belong to the previous protein
+    r$span_aa <- r$residue_max - r$residue_min
+    r$compaction <- ifelse(r$source == "mutation" & r$diameter_3d > 0, r$span_aa * 3.8 / r$diameter_3d, NA)
+    r
+  })
+
+  # Keep the table's highlight on the selected cluster when it is still listed.
+  observe({
+    d <- table_rows()
+    i <- match(selected_id(), d$cluster_id)
+    if (!is.null(selected_id()) && !identical(i, input$cluster_table_rows_selected))
+      selectRows(dataTableProxy("cluster_table"), if (is.na(i)) NULL else i)
   })
 
   # "Exons 1, 2, 5" for CNA clusters, "aa 232-246" for mutation clusters.
@@ -663,7 +686,10 @@ server <- function(input, output, session) {
     if (!any_conv) updateRadioButtons(session, "view", selected = "all")
   })
 
-  observeEvent(input$clear_selection, selectRows(dataTableProxy("cluster_table"), NULL))
+  observeEvent(input$clear_selection, {
+    selected_id(NULL)
+    selectRows(dataTableProxy("cluster_table"), NULL)
+  })
   output$clear_button <- renderUI(if (!is.null(selected())) tagList(
     tags$button(class = "btn btn-sm btn-outline-secondary", onclick = "grin3dExport()",
                 title = "Download this view as an SVG figure with a CSV of the cluster's statistics", "Export"),
