@@ -102,6 +102,27 @@ plddt_bins <- list(c(90, 101, "#0053D6"), c(70, 90, "#65CBF3"),
 backbone_grey <- "#D9D9D9"
 focus_grey <- "#EFEFEF"  # backbone outside the selected cluster
 
+# Tooltip text per residue for the 3D view: how many subjects carry each
+# alteration type at that residue, plus its exon and model confidence. CNA counts
+# are exon-level, since a copy-number event covers whole exons.
+hover_info <- function(d, types) {
+  r <- d$residues[is.na(d$residues$cluster_id) & d$residues$alteration_type %in% types, ]
+  if (!nrow(r)) return(setNames(list(), character()))
+  r <- r[order(r$residue, match(r$alteration_type, names(layer_colors))), ]
+  n <- function(x, word) sprintf("%d %s%s", x, word, ifelse(x == 1, "", "s"))
+  line <- sprintf("%s: %s, %s%s", layer_labels[r$alteration_type],
+                  n(r$n_subjects, "subject"), n(r$n_events, "event"),
+                  ifelse(r$alteration_type %in% cna_types | r$alteration_type == "ALL_CNA", " (exon)", ""))
+  ex <- unique(d$residues[!is.na(d$residues$exon_order), c("residue", "exon_order")])
+  exon_of <- setNames(as.character(ex$exon_order), ex$residue)
+  plddt <- setNames(d$coords$plddt, d$coords$residue)
+  out <- split(line, r$residue)
+  lapply(names(out), function(res) paste(c(
+    out[[res]],
+    if (!is.na(exon_of[res])) sprintf("Exon %s", exon_of[res]),
+    sprintf("pLDDT %.0f", plddt[[res]])), collapse = "\n")) |> setNames(names(out))
+}
+
 # One legend row per layer, doubling as its toggle: swatch shaped like the mark
 # (dot = mutation sphere, bar = CNA backbone), name, and cluster counts.
 layer_choice <- function(t, clusters) {
@@ -220,6 +241,10 @@ viewer_css <- tags$style(HTML(sprintf("
   .ann-item a:hover { border-bottom-color:%1$s; }
   .dom-sw { width:10px; height:10px; border-radius:2px; flex:none; display:inline-block; transform:translateY(1px); }
   .scope-note { font-size:11.5px; color:#6B6A66; margin:4px 0 0; }
+  #grin3d-tip { display:none; position:absolute; z-index:30; pointer-events:none; max-width:260px;
+                background:#FFFFFF; color:%1$s; border:1px solid #E2E4E8; border-radius:8px;
+                box-shadow:0 4px 16px rgba(20,24,31,.14); padding:7px 10px; font-size:12.5px; line-height:1.45; }
+  #grin3d-tip b { font-size:13px; }
   .frac { display:inline-block; width:104px; height:8px; border-radius:4px; background:#E9EAEE; overflow:hidden; vertical-align:middle; }
   .frac i { display:block; height:100%%; border-radius:4px; }
   table.dataTable td.frac-cell { width:120px; }
@@ -246,7 +271,73 @@ ui <- page_fluid(
       el.widget.render();
       Shiny.setInputValue('structure_png', {uri: c.toDataURL('image/png'), w: c.width, h: c.height}, {priority: 'event'});
     }
-    Shiny.addCustomMessageHandler('grin3d-download', function(id) { document.getElementById(id).click(); });
+    // Hover tooltips on the model. r3dmol does not expose 3Dmol's setHoverable,
+    // so the atoms are armed directly on the model the widget holds: the same
+    // fields setHoverable would set. Re-armed after every render, because each
+    // render builds a new model whose atoms start unarmed.
+    var grin3dInfo = {};
+    var grin3dHoverOn = true;
+    var NL = String.fromCharCode(10);  // R would turn a backslash-n escape here into a real newline
+    // An HTML tooltip rather than a 3Dmol label: 3Dmol draws labels as a single
+    // line, and these carry a line per alteration type.
+    function grin3dTip() {
+      var tip = document.getElementById('grin3d-tip');
+      if (!tip) {
+        tip = document.createElement('div');
+        tip.id = 'grin3d-tip';
+        document.body.appendChild(tip);
+      }
+      return tip;
+    }
+    function grin3dHoverIn(atom, viewer, event) {
+      if (!grin3dHoverOn) return;
+      var t = grin3dInfo[atom.resi];
+      var tip = grin3dTip();
+      tip.innerHTML = '<b>' + (atom.resn ? atom.resn + ' ' : '') + atom.resi + '</b>' +
+        (t ? '<br>' + t.split(NL).join('<br>') : '<br>no alterations here');
+      var x = event ? (event.pageX != null ? event.pageX : event.clientX + window.scrollX) : 0;
+      var y = event ? (event.pageY != null ? event.pageY : event.clientY + window.scrollY) : 0;
+      tip.style.left = (x + 16) + 'px';
+      tip.style.top = (y + 16) + 'px';
+      tip.style.display = 'block';
+    }
+    function grin3dHoverOut() {
+      var tip = document.getElementById('grin3d-tip');
+      if (tip) tip.style.display = 'none';
+    }
+    function grin3dArmHover() {
+      var el = document.getElementById('structure');
+      if (!el || !el.widget) return;
+      var model;
+      try { model = el.widget.getModel({}); } catch (e) { return; }
+      if (!model || !model.selectedAtoms) return;
+      var atoms = model.selectedAtoms({});
+      if (!atoms.length || atoms[0].hoverable) return;  // this model is already armed
+      atoms.forEach(function(a) {
+        a.intersectionShape = {sphere: [], cylinder: [], line: [], triangle: []};
+        a.hoverable = true;
+        a.hover_callback = grin3dHoverIn;
+        a.unhover_callback = grin3dHoverOut;
+      });
+      // Picking geometry is built when the model's styles are applied, so a plain
+      // render would leave the armed atoms unpickable. An empty additive setStyle
+      // rebuilds it without changing how anything looks.
+      model.setStyle({}, {}, true);
+      el.widget.render();
+    }
+    // Registration waits for Shiny: this script sits in the page head, where
+    // Shiny is not defined yet, and a throw here would skip everything below it.
+    function grin3dInit() {
+      Shiny.addCustomMessageHandler('grin3d-download', function(id) { document.getElementById(id).click(); });
+      Shiny.addCustomMessageHandler('grin3d-hover-data', function(d) { grin3dInfo = d || {}; });
+      Shiny.addCustomMessageHandler('grin3d-hover-enabled', function(on) {
+        grin3dHoverOn = !!on;
+        if (!grin3dHoverOn) grin3dHoverOut();
+      });
+      setInterval(grin3dArmHover, 700);
+    }
+    if (window.Shiny && Shiny.addCustomMessageHandler) grin3dInit();
+    else document.addEventListener('DOMContentLoaded', grin3dInit);
   "))),
   div(class = "appbar",
     h1(class = "wordmark", "GRIN3D"),
@@ -273,7 +364,10 @@ ui <- page_fluid(
           tags$details(class = "legend", open = NA,
             tags$summary("Layers"),
             uiOutput("context_key"),
-            uiOutput("layer_controls"))
+            uiOutput("layer_controls"),
+            div(class = "legend-section", style = "border-top:1px solid #E2E4E8; padding-top:8px",
+                input_switch("hover_tips", "Hover details", TRUE),
+                p(class = "hint", "Subjects per residue when you point at the model.")))
         ),
         div(class = "fm-wrap", uiOutput("feature_map"))
       )
@@ -478,6 +572,9 @@ server <- function(input, output, session) {
                      "p protein 1D", "p protein 3D"), 2)
   })
 
+  observe(session$sendCustomMessage("grin3d-hover-data", hover_info(dat(), c(visible(), "ALL_CNA"))))
+  observe(session$sendCustomMessage("grin3d-hover-enabled", isTRUE(input$hover_tips)))
+
   output$structure <- renderR3dmol({
     clusters <- dat()$clusters
     residues <- dat()$residues
@@ -544,7 +641,7 @@ server <- function(input, output, session) {
       }
     }
 
-    v |> m_zoom_to()
+    v |> m_set_hover_duration(120) |> m_zoom_to()
   })
 
   # Everything drawn around the selected cluster, shared by the structure, the
@@ -682,7 +779,7 @@ server <- function(input, output, session) {
                       border = layer_colors[[top$type[i]]])
     }
 
-    v |> m_zoom_to(sel = m_sel(resi = zoom, expand = 8))
+    v |> m_set_hover_duration(120) |> m_zoom_to(sel = m_sel(resi = zoom, expand = 8))
   }
 
   # The tool opens on the top convergent cluster (PTEN: the HOMDEL exon 1/2/5
