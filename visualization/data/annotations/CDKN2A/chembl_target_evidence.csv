@@ -1,0 +1,2 @@
+"protein","uniprot_accession","target_chembl_id","target_name","target_type","organism","tax_id","component_accessions","component_relationships","evidence_scope","source_url","retrieved_at_utc"
+"CDKN2A","P42771","CHEMBL4680027","Cyclin-dependent kinase inhibitor 2A","SINGLE PROTEIN","Homo sapiens","9606","P42771","SINGLE PROTEIN","protein_or_complex_target_record","https://www.ebi.ac.uk/chembl/explore/target/CHEMBL4680027","2026-09-17T05:12:51Z"

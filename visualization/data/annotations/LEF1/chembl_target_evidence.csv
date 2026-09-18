@@ -1,0 +1,2 @@
+"protein","uniprot_accession","target_chembl_id","target_name","target_type","organism","tax_id","component_accessions","component_relationships","evidence_scope","source_url","retrieved_at_utc"
+"LEF1","Q9UJU2","CHEMBL3217392","Lymphoid enhancer-binding factor 1","SINGLE PROTEIN","Homo sapiens","9606","Q9UJU2","SINGLE PROTEIN","protein_or_complex_target_record","https://www.ebi.ac.uk/chembl/explore/target/CHEMBL3217392","2026-09-17T19:53:29Z"

@@ -1,0 +1,8 @@
+"annotation_class","feature_category","feature_subcategory","classification_rule","n_features","sources","source_feature_types"
+"domain","domain","homologous_superfamily","grin3d_annotation_hierarchy_v1:homologous_superfamily",1,"InterPro","homologous_superfamily"
+"domain","domain","protein_family","grin3d_annotation_hierarchy_v1:protein_family",1,"InterPro","family"
+"functional_region","functional_region","repeat_region","grin3d_annotation_hierarchy_v1:repeat_region",4,"UniProtKB","Repeat"
+"interaction","interaction_interface","macromolecular_interface","pdbe_kb_sifts_v1:macromolecular_interface",1,"PDBe-KB/SIFTS","experimental interface"
+"interaction","interaction_interface","protein_protein_interface","pdbe_kb_sifts_v1:protein_protein_interface",1,"PDBe-KB/SIFTS","experimental interface"
+"modification","ptm","acetylation","grin3d_annotation_hierarchy_v1:acetylation",1,"UniProtKB","Modified residue"
+"modification","ptm","phosphorylation","grin3d_annotation_hierarchy_v1:phosphorylation",4,"UniProtKB","Modified residue"
