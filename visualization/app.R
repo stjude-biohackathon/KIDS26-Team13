@@ -564,7 +564,7 @@ server <- function(input, output, session) {
     # A residue on an exon boundary maps to both exons, so CNA clusters use their own exon list.
     exons <- if (s$source == "cna") as.integer(strsplit(s$exons, ";")[[1]])
              else sort(unique(ex$exon_order[ex$residue %in% seed]))
-    list(s = s, cr = cr, seed = seed, co = co, dom = dom, sites = sites, exons = exons)
+    list(s = s, cr = cr, seed = seed, co = co, dom = dom, sites = sites, exons = exons, zone = zone)
   })
 
   # Focus view for one cluster, drawn like a figure: the rest of the protein
@@ -657,6 +657,21 @@ server <- function(input, output, session) {
                                                       scale = if (muts$type[i] == s$alteration_type) 0.85 else 0.5))
     }
     # ponytail: glycines have no side chain, so a shared glycine shows only the second color
+
+    # Other mutations of the visible types inside the site, drawn small so they
+    # read as context: they are not part of a significant cluster here, but they
+    # are what the mutation layer toggles act on in this view.
+    near_mut <- bg[bg$alteration_type %in% layers()$mut & bg$residue %in% f$zone &
+                     !bg$residue %in% muts$residue, ]
+    near_mut <- near_mut[order(near_mut$residue, -near_mut$n_events), ]
+    near_mut <- near_mut[!duplicated(near_mut$residue), ]
+    for (i in seq_len(nrow(near_mut))) {
+      v <- v |> m_add_style(
+        sel = m_sel(resi = near_mut$residue[i], atom = "CA"),
+        style = m_style_sphere(colorScheme = NULL, color = layer_colors[[near_mut$alteration_type[i]]],
+                               opacity = 0.75, radius = min(1.8, 0.6 + 0.2 * sqrt(near_mut$n_events[i]))))
+    }
+
     # Labels: the selected cluster's busiest residues first, then a few of the other types'.
     own <- muts$type == s$alteration_type & s$source == "mutation"
     top <- rbind(head(muts[own, ][order(-muts$events[own]), ], 8), head(muts[!own, ][order(-muts$events[!own]), ], 3))
@@ -727,9 +742,13 @@ server <- function(input, output, session) {
         div(class = "eyebrow", "At this site"),
         lapply(types, function(t) div(class = "key-row", HTML(type_chip(t)),
           span(class = "count", if (t == f$s$alteration_type) "selected"
-               else if (f$s$source == "cna" && !t %in% mut_types) "within exons"))),
+               else if (f$s$source == "cna" && !t %in% mut_types) "same exons"))),
         lapply(seq_len(NROW(f$dom)), function(i) key_row(f$dom$color[i], f$dom$feature_name[i])),
-        lapply(unique(f$sites$kind), function(k) key_row(site_color, k))))
+        lapply(unique(f$sites$kind), function(k) key_row(site_color, k)),
+        p(class = "hint", "Large marks: clusters at this site. Small spheres: other mutations of the ",
+          "visible types nearby, not in a significant cluster here.",
+          if (f$s$source == "cna" && any(!types %in% mut_types & types != f$s$alteration_type))
+            " Types marked \u201csame exons\u201d lie on the exons already drawn, so hiding one changes this list, not the structure.")))
     }
     if (identical(input$backbone, "domains") && !is.null(dat()$ann)) {
       d <- dat()$ann$domains
