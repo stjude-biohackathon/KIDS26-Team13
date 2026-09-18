@@ -1,0 +1,8 @@
+"label","protein","n_sim","min_subjects","min_events","random_seed","require_complete_event_mapping","avoid_within_subject_overlap","confidence_filter","min_confidence","opportunity_weights","elapsed_seconds","n_clusters","n_significant","results_dir"
+"TP53_baseline_200","TP53",200,2,2,20260828,TRUE,TRUE,FALSE,NA,FALSE,9.679,41,0,"/Users/sharmapk/Desktop/KIDS26-Team13/examples/mutation_stability_results/TP53_baseline_200"
+"TP53_min3_500","TP53",500,3,3,20260828,TRUE,TRUE,FALSE,NA,FALSE,23.28,28,11,"/Users/sharmapk/Desktop/KIDS26-Team13/examples/mutation_stability_results/TP53_min3_500"
+"TP53_baseline_seed2_500","TP53",500,2,2,20260829,TRUE,TRUE,FALSE,NA,FALSE,23.915,41,0,"/Users/sharmapk/Desktop/KIDS26-Team13/examples/mutation_stability_results/TP53_baseline_seed2_500"
+"SUZ12_baseline_200","SUZ12",200,2,2,20260828,TRUE,TRUE,FALSE,NA,FALSE,26.653,96,0,"/Users/sharmapk/Desktop/KIDS26-Team13/examples/mutation_stability_results/SUZ12_baseline_200"
+"SUZ12_min3_500","SUZ12",500,3,3,20260828,TRUE,TRUE,FALSE,NA,FALSE,69.131,71,0,"/Users/sharmapk/Desktop/KIDS26-Team13/examples/mutation_stability_results/SUZ12_min3_500"
+"EZH2_baseline_200","EZH2",200,2,2,20260828,TRUE,TRUE,FALSE,NA,FALSE,40.166,110,0,"/Users/sharmapk/Desktop/KIDS26-Team13/examples/mutation_stability_results/EZH2_baseline_200"
+"EZH2_min3_500","EZH2",500,3,3,20260828,TRUE,TRUE,FALSE,NA,FALSE,95.943,83,0,"/Users/sharmapk/Desktop/KIDS26-Team13/examples/mutation_stability_results/EZH2_min3_500"

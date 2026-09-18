@@ -1,0 +1,2 @@
+"label","protein","n_sim","min_subjects","min_events","random_seed","require_complete_event_mapping","avoid_within_subject_overlap","confidence_filter","min_confidence","opportunity_weights","elapsed_seconds","n_clusters","n_significant","results_dir"
+"EZH2_min3_500","EZH2",500,3,3,20260828,TRUE,TRUE,FALSE,NA,FALSE,95.943,83,0,"/Users/sharmapk/Desktop/KIDS26-Team13/examples/mutation_stability_results/EZH2_min3_500"

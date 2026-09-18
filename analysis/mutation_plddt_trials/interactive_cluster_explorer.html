@@ -1,0 +1,222 @@
+<div id="grin-cluster-explorer" class="grin-explorer">
+  <style>
+    .grin-explorer { border: 1px solid #ccd5df; border-radius: 8px; padding: 16px; margin: 18px 0 28px; background: #fff; }
+    .grin-controls { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: end; margin-bottom: 12px; }
+    .grin-controls label { display: flex; flex-direction: column; gap: 4px; font-weight: 600; font-size: 0.9em; }
+    .grin-controls select { min-width: 115px; padding: 5px 8px; border: 1px solid #aeb8c2; border-radius: 4px; background: white; }
+    .grin-explorer-note { color: #44515e; margin: 8px 0 14px; }
+    .grin-legend { display: flex; flex-wrap: wrap; gap: 7px 14px; margin: 8px 0; font-size: 0.84em; }
+    .grin-legend span { white-space: nowrap; }
+    .grin-swatch { display: inline-block; width: 13px; height: 13px; margin-right: 4px; vertical-align: -2px; border: 1px solid #6e7882; }
+    .grin-scroll { overflow-x: auto; border-top: 1px solid #e2e7ec; padding-top: 8px; }
+    .grin-scroll svg { display: block; width: 100%; min-width: 780px; height: auto; }
+    .grin-details { margin: 14px 0 5px; padding: 10px 12px; background: #edf4fa; border-left: 4px solid #2166ac; overflow-wrap: anywhere; }
+    .grin-details strong { margin-right: 4px; }
+    .grin-track-title { margin: 14px 0 2px; font-weight: 700; }
+    .grin-track-note { margin: 0 0 5px; color: #55616d; font-size: 0.88em; }
+    .grin-explorer .axis-label { font-size: 12px; fill: #313942; }
+    .grin-explorer .row-label { font-size: 11px; fill: #313942; cursor: pointer; }
+    .grin-explorer .cell { cursor: pointer; }
+    .grin-explorer .cell:hover { stroke: #111 !important; stroke-width: 2px !important; }
+    @media (max-width: 720px) { .grin-controls { gap: 10px; } }
+  </style>
+
+  <div class="grin-controls">
+    <label>Protein<select id="grin-protein"></select></label>
+    <label>Matrix pLDDT<select id="grin-threshold"></select></label>
+    <label>Selected trial<select id="grin-trial"></select></label>
+    <label>Clusters shown<select id="grin-limit"><option>10</option><option selected>20</option><option>40</option></select></label>
+  </div>
+  <p class="grin-explorer-note">
+    Cell color is the corrected joint p-value. Rows are residue-defined candidate clusters; click a cell to inspect that cluster and its best residue-overlap match at every pLDDT threshold.
+  </p>
+  <div class="grin-legend">
+    <span><i class="grin-swatch" style="background:#7f0000"></i>p ≤ 0.01</span>
+    <span><i class="grin-swatch" style="background:#d7301f"></i>p ≤ 0.05</span>
+    <span><i class="grin-swatch" style="background:#fc8d59"></i>p ≤ 0.10</span>
+    <span><i class="grin-swatch" style="background:#fee08b"></i>p ≤ 0.25</span>
+    <span><i class="grin-swatch" style="background:#d9ef8b"></i>p ≤ 0.50</span>
+    <span><i class="grin-swatch" style="background:#e8edf2"></i>p &gt; 0.50</span>
+  </div>
+  <div class="grin-scroll"><svg id="grin-matrix" role="img" aria-label="Cluster p-values across trial counts"></svg></div>
+  <div id="grin-details" class="grin-details"></div>
+  <div class="grin-track-title">Best-matching residue set across pLDDT thresholds</div>
+  <p class="grin-track-note">Tracks use the 1,000-trial candidate sets. Jaccard measures residue overlap with the selected matrix row.</p>
+  <div class="grin-scroll"><svg id="grin-tracks" role="img" aria-label="Best matching cluster residues across pLDDT thresholds"></svg></div>
+</div>
+
+<script>
+(function () {
+  const data = __CLUSTER_DATA__;
+  const root = document.getElementById('grin-cluster-explorer');
+  if (!root || root.dataset.ready === 'true') return;
+  root.dataset.ready = 'true';
+
+  const proteinControl = root.querySelector('#grin-protein');
+  const thresholdControl = root.querySelector('#grin-threshold');
+  const trialControl = root.querySelector('#grin-trial');
+  const limitControl = root.querySelector('#grin-limit');
+  const matrix = root.querySelector('#grin-matrix');
+  const tracks = root.querySelector('#grin-tracks');
+  const details = root.querySelector('#grin-details');
+  const ns = 'http://www.w3.org/2000/svg';
+
+  const uniqueSorted = (values, numeric) => [...new Set(values)].sort(numeric ? ((a, b) => +a - +b) : undefined);
+  const preferredProteinOrder = ['TP53', 'PTEN', 'SUZ12', 'EZH2', 'LEF1'];
+  const proteins = uniqueSorted(data.history.map(d => d.protein), false).sort((a, b) => {
+    const ai = preferredProteinOrder.indexOf(a), bi = preferredProteinOrder.indexOf(b);
+    return (ai < 0 ? 999 : ai) - (bi < 0 ? 999 : bi) || a.localeCompare(b);
+  });
+  const thresholds = uniqueSorted(data.history.map(d => +d.threshold), true);
+  const trials = uniqueSorted(data.history.map(d => +d.trials), true);
+
+  function options(control, values, selected) {
+    control.innerHTML = values.map(v => `<option value="${v}"${String(v) === String(selected) ? ' selected' : ''}>${v}</option>`).join('');
+  }
+  options(proteinControl, proteins, proteins[0]);
+  options(thresholdControl, thresholds, 0);
+  options(trialControl, trials, Math.max(...trials));
+
+  const state = { protein: proteins[0], threshold: 0, trial: Math.max(...trials), selectedKey: null };
+  const residueArray = value => String(value).split(';').map(Number).filter(Number.isFinite);
+  const residueSet = value => new Set(residueArray(value));
+  const fmtP = p => (+p).toFixed(4);
+  const pColor = p => p <= .01 ? '#7f0000' : p <= .05 ? '#d7301f' : p <= .10 ? '#fc8d59' : p <= .25 ? '#fee08b' : p <= .50 ? '#d9ef8b' : '#e8edf2';
+  const textColor = p => p <= .10 ? '#fff' : '#20272e';
+
+  function svgElement(name, attrs, text) {
+    const el = document.createElementNS(ns, name);
+    Object.entries(attrs || {}).forEach(([key, value]) => el.setAttribute(key, value));
+    if (text !== undefined) el.textContent = text;
+    return el;
+  }
+
+  function jaccard(a, b) {
+    let shared = 0;
+    a.forEach(x => { if (b.has(x)) shared += 1; });
+    return shared / (a.size + b.size - shared);
+  }
+
+  function summarizeResidues(value) {
+    const r = residueArray(value);
+    return r.length === 1 ? `r${r[0]}` : `r${Math.min(...r)}–${Math.max(...r)} (${r.length})`;
+  }
+
+  function selectedRows() {
+    const all = data.history.filter(d => d.protein === state.protein && +d.threshold === +state.threshold);
+    const reference = all.filter(d => +d.trials === Math.max(...trials));
+    reference.sort((a, b) => (+a.p - +b.p) || (+b.subjects - +a.subjects));
+    return reference.slice(0, +limitControl.value);
+  }
+
+  function renderMatrix() {
+    const rows = selectedRows();
+    if (!rows.length) return;
+    if (!rows.some(d => d.key === state.selectedKey)) state.selectedKey = rows[0].key;
+
+    const left = 185, top = 32, cellW = 66, rowH = 23;
+    const width = left + trials.length * cellW + 10;
+    const height = top + rows.length * rowH + 32;
+    matrix.innerHTML = '';
+    matrix.setAttribute('viewBox', `0 0 ${width} ${height}`);
+
+    trials.forEach((trial, col) => {
+      matrix.appendChild(svgElement('text', {
+        x: left + col * cellW + cellW / 2, y: 18,
+        'text-anchor': 'middle', class: 'axis-label'
+      }, trial));
+    });
+
+    rows.forEach((row, rowIndex) => {
+      const y = top + rowIndex * rowH;
+      const label = svgElement('text', {
+        x: left - 8, y: y + 15, 'text-anchor': 'end', class: 'row-label',
+        'font-weight': row.key === state.selectedKey ? '700' : '400'
+      }, summarizeResidues(row.residues));
+      label.appendChild(svgElement('title', {}, `Residues: ${row.residues}`));
+      label.addEventListener('click', () => { state.selectedKey = row.key; render(); });
+      matrix.appendChild(label);
+
+      trials.forEach((trial, col) => {
+        const d = data.history.find(x => x.protein === state.protein && +x.threshold === +state.threshold && +x.trials === +trial && x.key === row.key);
+        if (!d) return;
+        const rect = svgElement('rect', {
+          x: left + col * cellW + 1, y: y + 1, width: cellW - 2, height: rowH - 2,
+          fill: pColor(+d.p), stroke: row.key === state.selectedKey && +trial === +state.trial ? '#111' : '#fff',
+          'stroke-width': row.key === state.selectedKey && +trial === +state.trial ? 3 : 1,
+          class: 'cell'
+        });
+        rect.appendChild(svgElement('title', {}, `${d.cluster}; trials=${trial}; p=${fmtP(d.p)}; subjects=${d.subjects}; events=${d.events}; residues=${d.residues}`));
+        rect.addEventListener('click', () => {
+          state.selectedKey = row.key;
+          state.trial = +trial;
+          trialControl.value = String(trial);
+          render();
+        });
+        matrix.appendChild(rect);
+        matrix.appendChild(svgElement('text', {
+          x: left + col * cellW + cellW / 2, y: y + 15,
+          'text-anchor': 'middle', 'font-size': '10px', fill: textColor(+d.p),
+          'pointer-events': 'none'
+        }, fmtP(d.p)));
+      });
+    });
+    matrix.appendChild(svgElement('text', { x: left + trials.length * cellW / 2, y: height - 5, 'text-anchor': 'middle', class: 'axis-label' }, 'Null-simulation trials'));
+  }
+
+  function bestMatch(selected, threshold) {
+    const selectedSet = residueSet(selected.residues);
+    const candidates = data.reference.filter(d => d.protein === state.protein && +d.threshold === +threshold);
+    let best = null, bestScore = -1;
+    candidates.forEach(candidate => {
+      const score = jaccard(selectedSet, residueSet(candidate.residues));
+      if (score > bestScore || (score === bestScore && +candidate.p < +(best ? best.p : Infinity))) {
+        best = candidate;
+        bestScore = score;
+      }
+    });
+    return { candidate: best, score: bestScore };
+  }
+
+  function renderTracks(selected) {
+    const width = 980, height = 205, x0 = 105, x1 = 845;
+    const proteinLength = +data.lengths.find(d => d.protein === state.protein).length;
+    const scale = residue => x0 + ((+residue - 1) / Math.max(1, proteinLength - 1)) * (x1 - x0);
+    tracks.innerHTML = '';
+    tracks.setAttribute('viewBox', `0 0 ${width} ${height}`);
+
+    thresholds.forEach((threshold, index) => {
+      const y = 43 + index * 57;
+      const match = bestMatch(selected, threshold);
+      const candidate = match.candidate;
+      tracks.appendChild(svgElement('text', { x: 10, y: y + 4, class: 'axis-label', 'font-weight': +threshold === +state.threshold ? '700' : '400' }, `pLDDT ≥ ${threshold}`));
+      tracks.appendChild(svgElement('line', { x1: x0, x2: x1, y1: y, y2: y, stroke: '#9aa5af', 'stroke-width': 3 }));
+      const tickPath = residueArray(candidate.residues).map(r => `M${scale(r).toFixed(2)},${y - 9}V${y + 9}`).join('');
+      tracks.appendChild(svgElement('path', {
+        d: tickPath,
+        stroke: candidate.significant ? '#b2182b' : (+threshold === +state.threshold ? '#2166ac' : '#586874'),
+        'stroke-width': candidate.significant ? 2.2 : 1.6
+      }));
+      tracks.appendChild(svgElement('text', { x: x1 + 12, y: y - 3, class: 'axis-label' }, `J=${match.score.toFixed(3)}; p=${fmtP(candidate.p)}`));
+      tracks.appendChild(svgElement('text', { x: x1 + 12, y: y + 14, class: 'axis-label' }, `${residueArray(candidate.residues).length} residues${candidate.significant ? '; significant' : ''}`));
+    });
+    tracks.appendChild(svgElement('text', { x: x0, y: height - 4, class: 'axis-label', 'text-anchor': 'middle' }, '1'));
+    tracks.appendChild(svgElement('text', { x: x1, y: height - 4, class: 'axis-label', 'text-anchor': 'middle' }, String(proteinLength)));
+  }
+
+  function render() {
+    renderMatrix();
+    const selected = data.history.find(d => d.protein === state.protein && +d.threshold === +state.threshold && +d.trials === +state.trial && d.key === state.selectedKey)
+      || data.history.find(d => d.protein === state.protein && +d.threshold === +state.threshold && d.key === state.selectedKey);
+    if (!selected) return;
+    details.innerHTML = `<strong>${state.protein}, pLDDT ≥ ${state.threshold}, ${state.trial} trials:</strong> ${selected.cluster}; corrected joint p=${fmtP(selected.p)} (${selected.significant ? 'significant' : 'not significant'}); ${selected.subjects} subjects; ${selected.events} events; residues ${selected.residues}.`;
+    renderTracks(selected);
+  }
+
+  proteinControl.addEventListener('change', () => { state.protein = proteinControl.value; state.selectedKey = null; render(); });
+  thresholdControl.addEventListener('change', () => { state.threshold = +thresholdControl.value; state.selectedKey = null; render(); });
+  trialControl.addEventListener('change', () => { state.trial = +trialControl.value; render(); });
+  limitControl.addEventListener('change', render);
+  render();
+})();
+</script>

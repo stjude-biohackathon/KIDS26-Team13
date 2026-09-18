@@ -1,0 +1,11 @@
+source=datasets/T_ALL_public_data/mutations_dataset.xlsx
+source_fields=gene,sample,variantID,aa_change,mutation_class,ExonicFunc,validation,quality.MULTI
+coordinate_rule=first affected residue; explicit amino-acid deletion/substitution ranges retain both endpoints
+gene=PTEN
+included_rows=313
+excluded_without_resolvable_aa_position=11
+refseq_transcript=NM_000314
+refseq_protein=NP_000305.3
+uniprot_accession=P60484
+coordinate_source=AlphaFold_DB_AF-P60484-F1-model_v6.pdb
+sequence_validation=All extracted mutation positions fall within canonical UniProt P60484 (403 residues)
