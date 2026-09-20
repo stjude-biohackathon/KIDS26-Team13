@@ -146,7 +146,8 @@
           'stroke-width': row.key === state.selectedKey && +trial === +state.trial ? 3 : 1,
           class: 'cell'
         });
-        rect.appendChild(svgElement('title', {}, `${d.cluster}; trials=${trial}; p=${fmtP(d.p)}; subjects=${d.subjects}; events=${d.events}; residues=${d.residues}`));
+        const paeText = d.paeSupported === null ? 'PAE=n/a' : `PAE support=${d.paeSupported ? 'supported' : 'uncertain'}; reliable pairs=${(+d.paeReliableFraction).toFixed(2)}`;
+        rect.appendChild(svgElement('title', {}, `${d.cluster}; trials=${trial}; p=${fmtP(d.p)}; ${paeText}; subjects=${d.subjects}; events=${d.events}; residues=${d.residues}`));
         rect.addEventListener('click', () => {
           state.selectedKey = row.key;
           state.trial = +trial;
@@ -209,7 +210,10 @@
     const selected = data.history.find(d => d.protein === state.protein && +d.threshold === +state.threshold && +d.trials === +state.trial && d.key === state.selectedKey)
       || data.history.find(d => d.protein === state.protein && +d.threshold === +state.threshold && d.key === state.selectedKey);
     if (!selected) return;
-    details.innerHTML = `<strong>${state.protein}, pLDDT ≥ ${state.threshold}, ${state.trial} trials:</strong> ${selected.cluster}; corrected joint p=${fmtP(selected.p)} (${selected.significant ? 'significant' : 'not significant'}); ${selected.subjects} subjects; ${selected.events} events; residues ${selected.residues}.`;
+    const paeDetail = selected.paeSupported === null
+      ? 'pairwise PAE not applicable (singleton cluster)'
+      : `PAE ${selected.paeSupported ? 'supported' : 'uncertain'} at ≤10 Å; reliable-pair fraction=${(+selected.paeReliableFraction).toFixed(3)}; median=${(+selected.paeMedian).toFixed(2)} Å; p90=${(+selected.paeP90).toFixed(2)} Å; max=${(+selected.paeMax).toFixed(2)} Å`;
+    details.innerHTML = `<strong>${state.protein}, pLDDT ≥ ${state.threshold}, ${state.trial} trials:</strong> ${selected.cluster}; corrected joint p=${fmtP(selected.p)} (${selected.significant ? 'significant' : 'not significant'}); ${paeDetail}; ${selected.subjects} subjects; ${selected.events} events; residues ${selected.residues}.`;
     renderTracks(selected);
   }
 
