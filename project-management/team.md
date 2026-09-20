@@ -13,6 +13,7 @@
 | --- | --- | --- | --- |
 | Abdelrahman Elsayed | Team lead | Overall project direction, integration, and coordination | Team review of methods and deliverables |
 | Ramzi Alsallaq | CNA analysis and structural eligibility | Developed the CNA eligibility/localization scan; evaluated PTEN and CDKN2A CNA events across coding coverage, exon mapping, structural eligibility, and sensitivity thresholds; produced the analysis result tables and documented untestable whole-gene events | Review of eligibility assumptions and integration with the permutation workflow |
+| Andrew Willems | Visualization lead | Built the GRIN3D interactive structure viewer (Shiny + r3dmol) showing mutation and CNA hotspots on one AlphaFold structure; defined the standard viewer input format | Standard result tables from the mutation and CNA prototypes |
 
 ## Current CNA Analysis Contribution
 
@@ -31,3 +32,15 @@ Result files are in `02_results/`.
 Multiple sensitivity analyses were run to test whether the PTEN CNA findings depended on a single modeling choice. The analyses varied: (1) the structural-confidence filter (pLDDT 60, 70, and 80), (2) the number of closest cross-exon C-alpha distances used in the 3D metric (5 versus 10), (3) the minimum sequence separation for cross-exon residue pairs (0, 5, 10, and 20 residues), (4) the coding-coverage and exon-overlap rules used to define localizable events, (5) the effective-number-of-placement-windows diagnostic threshold, and (6) the mixture of uniform and span-matched CNA placement in the null model.
 
 Across these reasonable parameter settings, the exact set and size of reported clusters changed—as expected when different CNA events or residue pairs became eligible—but the principal combined-CNA signal remained. The all-CNA analysis repeatedly produced highly significant joint results (minimum empirical `p_any_joint = 0.002` in the tested runs), with the strongest results consistently involving overlapping groups among exons 1–5. The pLDDT sweep retained 17 significant clusters at each threshold; sequence-separation and cross-exon-distance settings retained 12–15 and 12 significant clusters, respectively. These checks support that the observed PTEN exon-level pattern is not an artifact of one specific structural-distance or sequence-separation setting. The findings remain exploratory and conditional on a CNA already overlapping PTEN; they do not establish genome-wide gene recurrence.
+
+## Current Visualization Contribution
+
+**Lead: Andrew Willems ([@compbiolover](https://github.com/compbiolover))**
+
+The interactive GRIN3D structure viewer displays mutation hotspots and CNA-affected exons on the same AlphaFold structure. Source is in `visualization/` (see its `README.md`). It provides:
+
+- A Shiny + r3dmol viewer covering PTEN, CDKN2A, TP53, FBXW7, JAK3, IL7R and LEF1.
+- Per-alteration layers (SNV, indel, HOMDEL, HETDEL, GAIN, AMP, pooled CNA) that can be shown or hidden, in a colorblind-checked palette.
+- A focus view for a selected cluster showing its residues or exons, other alteration types at the same 3D site, the domains it falls in, and nearby functional sites.
+- Cluster details: subjects, events, 1D/3D diameters, empirical p-values and pLDDT, alongside UniProt, InterPro, PDBe-KB and ChEMBL annotations from the annotation module.
+- Figure (SVG) and table (CSV) export per cluster, plus a defined three-table input format so any GRIN3D prototype result can be displayed.
