@@ -16,7 +16,7 @@
 | Candice | CNA hotspot framework | Refine CNA eligibility and localization rules; test the framework using PTEN and CDKN2A | Statistical and structural review of proposed rules |
 | Pramesh | Mutation hotspots and interpretation | Test the mutation prototype and explore functional annotation of candidate clusters | Input on protein annotations and suitable comparison proteins |
 | Eliijah | Tree construction and cluster selection | Review the mutation and CNA trees, cluster selection, and alternatives | Statistical and structural input on distance definitions |
-| Andrew | Integrated visualization | Develop an interactive view of mutation hotspots and CNA-affected exons | Standard result tables and a suitable PTEN example |
+| Andrew Willems ([@compbiolover](https://github.com/compbiolover)) | Visualization lead (integrated visualization) | Develop an interactive view of mutation hotspots and CNA-affected exons | Standard result tables and a suitable PTEN example |
 
 ## Team Responsibilities and Deliverables
 
