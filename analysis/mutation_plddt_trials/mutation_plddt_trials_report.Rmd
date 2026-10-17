@@ -86,6 +86,8 @@ run_metrics <- read.csv(file.path(summary_dir, "run_metrics.csv"), stringsAsFact
 convergence <- read.csv(file.path(summary_dir, "trial_convergence_metrics.csv"), stringsAsFactors = FALSE)
 pvalue_clusters <- read.csv(file.path(summary_dir, "cluster_pvalue_convergence.csv"), stringsAsFactors = FALSE)
 earliest <- read.csv(file.path(summary_dir, "earliest_significance_convergence.csv"), stringsAsFactors = FALSE)
+pae_run_summary <- read.csv(file.path(summary_dir, "pae_run_summary.csv"), stringsAsFactors = FALSE)
+pae_cutoff_sensitivity <- read.csv(file.path(summary_dir, "pae_cutoff_sensitivity.csv"), stringsAsFactors = FALSE)
 
 knitr::opts_chunk$set(
   echo = TRUE, message = FALSE, warning = FALSE,
@@ -563,6 +565,60 @@ does not guarantee that every p-value moves downward. The relevant objective is
 convergence of p-values and significance decisions, not monotonic reduction.
 </div>
 
+# PAE support for three-dimensional clusters
+
+Predicted aligned error (PAE) addresses a different uncertainty than pLDDT.
+pLDDT describes local confidence at one residue, whereas PAE describes the
+confidence in the relative placement of a pair of residues. For each
+multi-residue candidate, this analysis conservatively symmetrizes AlphaFold's
+directional matrix using `max(PAE[i,j], PAE[j,i])` and reports the median,
+90th percentile, maximum, and fraction of within-cluster pairs at or below
+10 Å. A cluster is marked **PAE-supported** when at least 80% of its pairs meet
+that cutoff. Singleton candidates have no pairwise PAE classification.
+
+These values are a structural-confidence layer. They do not change candidate
+membership, null simulations, corrected p-values, or statistical significance.
+
+```{r pae-support-at-1000, echo=FALSE}
+pae_1000 <- pae_run_summary[pae_run_summary$n_sim == 1000, c(
+  "protein", "plddt_threshold", "n_multiresidue_clusters", "n_pae_supported",
+  "pae_supported_fraction", "n_significant", "n_significant_pae_supported"
+)]
+names(pae_1000) <- c(
+  "Protein", "pLDDT", "Multi-residue clusters", "PAE-supported",
+  "Supported fraction", "Significant", "Significant and PAE-supported"
+)
+display_table(pae_1000, caption = "PAE support at 1,000 null-simulation trials")
+```
+
+The unfiltered results provide the broadest structural stress test. PAE support
+is lower there for TP53, SUZ12, EZH2, and LEF1 because the candidate set can
+join residues whose relative placement is uncertain. Increasing the pLDDT
+threshold generally raises the PAE-supported fraction, but it also changes the
+eligible coordinates and mutation cohort. Therefore, improved PAE support after
+filtering should not be interpreted as the same clusters becoming more certain.
+
+```{r pae-heatmaps, echo=FALSE, out.width='100%', fig.show='hold'}
+knitr::include_graphics(file.path(
+  figure_dir,
+  paste0(c("TP53", "PTEN", "SUZ12", "EZH2", "LEF1"), "_pae_cluster_heatmap.png")
+))
+```
+
+The colored boxes mark the ten lowest corrected-p candidates in each protein's
+unfiltered 1,000-trial analysis. A compact box over a low-PAE region supports
+the predicted relative geometry; boxes spanning high-PAE regions warrant a
+more cautious 3D interpretation. The saved cutoff-sensitivity table repeats the
+classification at 5, 10, and 15 Å so the 10 Å choice is not treated as a unique
+biological truth.
+
+<div class="caution">
+**Interpretation boundary.** A statistically significant but PAE-uncertain
+cluster remains a statistical hotspot; its specific 3D arrangement is
+uncertain. Conversely, PAE support does not make a nonsignificant candidate
+statistically significant.
+</div>
+
 # Recommendations
 
 1. Treat observed cluster membership as reproducible candidate generation when
@@ -579,6 +635,8 @@ convergence of p-values and significance decisions, not monotonic reduction.
    variability; the present nested fixed-seed runs measure resolution behavior.
 7. Keep biological annotation as a separate evidence layer from statistical
    significance.
+8. Report PAE support next to every multi-residue 3D claim and review results
+   across the 5, 10, and 15 Å sensitivity cutoffs.
 
 <div class="callout">
 **Handoff summary.** The prototype is ready for documented exploratory hotspot
@@ -604,6 +662,8 @@ Primary files used by the notebook:
 - `results/summary/trial_convergence_metrics.csv`: p-value convergence metrics;
 - `results/summary/cluster_pvalue_convergence.csv`: cluster-level p-value trajectories;
 - `results/summary/earliest_significance_convergence.csv`: exact-set stability;
+- `results/summary/cluster_pae_support.csv`: cluster-level PAE metrics;
+- `results/summary/pae_cutoff_sensitivity.csv`: PAE support at 5, 10, and 15 Å;
 - `results/figures/`: precomputed overlap and convergence figures.
 
 TP53 structural-confidence source:

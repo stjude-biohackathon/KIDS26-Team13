@@ -176,3 +176,32 @@ The convergence figures are `*_trial_convergence_overview.png` and
 All trial series use the same random seed, which makes increasing runs nested
 and useful for resolution diagnostics. Separate-seed runs would be required to
 measure Monte Carlo variability independently.
+
+## PAE structural-confidence layer
+
+Official AlphaFold DB v6 predicted-aligned-error matrices were added for all
+five proteins. PAE was not used to change cluster construction, the null model,
+or statistical significance. For every multi-residue candidate, directional
+PAE was symmetrized with the pairwise maximum. The primary support label
+requires at least 80% of within-cluster residue pairs to have PAE <= 10 Å.
+
+At 1,000 trials, PAE-supported/significant counts at pLDDT 0, 70, and 90 were:
+
+| Protein | pLDDT 0 | pLDDT 70 | pLDDT 90 |
+|---|---:|---:|---:|
+| TP53 | 7/11 | 6/6 | 6/6 |
+| PTEN | 0/0 | 0/0 | 0/0 |
+| SUZ12 | 0/0 | 0/0 | 2/2 |
+| EZH2 | 0/0 | 21/25 | 8/9 |
+| LEF1 | 6/9 | 6/6 | 1/1 |
+
+This does not mean pLDDT filtering repairs an unchanged cluster. Filtering can
+change the coordinate set, retained mutation cohort, and candidate membership.
+A significant but PAE-uncertain result remains a statistical hotspot whose
+specific 3D interpretation requires caution. PAE support alone does not make a
+candidate statistically significant.
+
+Cluster-level results are in `cluster_pae_support.csv`; classifications at
+5, 10, and 15 Å are in `pae_cutoff_sensitivity.csv`; and the
+`*_pae_cluster_heatmap.png` figures show the lowest-p candidates over each
+protein's full PAE matrix.
